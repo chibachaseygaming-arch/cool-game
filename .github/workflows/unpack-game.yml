@@ -1,0 +1,42 @@
+name: Unpack NEON COP CHASE game
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "NEON_COP_CHASE_FULL_GAME_PACKAGE.zip"
+      - ".github/workflows/unpack-game.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack full game package
+        shell: bash
+        run: |
+          rm -rf .game-unpack
+          mkdir -p .game-unpack
+          unzip -o NEON_COP_CHASE_FULL_GAME_PACKAGE.zip -d .game-unpack
+          cp .game-unpack/NEON_COP_CHASE_FULL_GAME/index.html ./index.html
+          cp .game-unpack/NEON_COP_CHASE_FULL_GAME/README.txt ./README.txt
+          cp ".game-unpack/NEON_COP_CHASE_FULL_GAME/START GAME.cmd" "./START GAME.cmd"
+          rm -rf .game-unpack
+
+      - name: Commit extracted game files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html README.txt "START GAME.cmd"
+          if git diff --cached --quiet; then
+            echo "Game files are already up to date."
+            exit 0
+          fi
+          git commit -m "Unpack full NEON COP CHASE game"
+          git push
