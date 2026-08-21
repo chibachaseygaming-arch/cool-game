@@ -1,0 +1,4333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>NEON PURSUIT - 3D Cop Chase</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#071018;font-family:Inter,system-ui,Arial,sans-serif}
+  canvas{display:block}
+  #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 6px #000}
+  .top{display:flex;justify-content:space-between;gap:12px;padding:14px}
+  .panel{background:rgba(5,12,20,.68);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);border-radius:14px;padding:10px 14px;min-width:160px}
+  .big{font-size:28px;font-weight:900;letter-spacing:1px}
+  .small{font-size:12px;opacity:.78}
+  #healthWrap{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(520px,72vw)}
+  #healthLabel{display:flex;justify-content:space-between;font-weight:800;font-size:12px;margin-bottom:6px}
+  #healthOuter{height:18px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)}
+  #healthBar{height:100%;width:100%;background:linear-gradient(90deg,#20d36b,#ffd43b,#ff4242);transform-origin:left center}
+  #heat{position:absolute;top:92px;left:14px}
+  #help{position:absolute;right:14px;bottom:18px;text-align:right;font-size:12px;line-height:1.5;opacity:.85}
+  #start,#gameover{
+    position:fixed;inset:0;
+    display:grid;place-items:center;
+    background:radial-gradient(circle at center,rgba(10,24,40,.55),rgba(0,0,0,.88));
+    color:white;z-index:10;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    padding:24px 12px;
+    box-sizing:border-box;
+  }
+  #gameover{display:none}
+  .card{
+    width:min(650px,88vw);
+    max-height:none;
+    background:rgba(6,14,24,.9);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:22px;
+    padding:28px;
+    box-shadow:0 20px 80px rgba(0,0,0,.5);
+    box-sizing:border-box;
+    margin:auto;
+  }
+  #upgradeShop{display:none;margin:18px 0 16px}
+  #vehicleChoice{display:none;margin:12px 0;padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(255,255,255,.05)}
+  .vehicleButtons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}
+  .vehicleBtn.active{outline:2px solid #5de1ff}
+  .upgradeHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+  .upgradeGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .upgradeItem{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px}
+  .upgradeItem b{display:block;font-size:15px;margin-bottom:4px}
+  .upgradeItem .small{display:block;min-height:32px;margin-bottom:8px}
+  .upgradeItem button{width:100%;padding:10px 12px;font-size:13px}
+  .upgradeItem button:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  #upgradePoints{font-size:22px;font-weight:900;color:#ffd43b}
+  @media(max-width:560px){
+    .upgradeGrid{grid-template-columns:1fr}
+    .card{width:94vw;padding:20px}
+    #start,#gameover{place-items:start center;padding-top:18px;padding-bottom:40px}
+  }
+  @media(max-height:760px){
+    #start,#gameover{place-items:start center}
+    .card{margin-top:8px;margin-bottom:24px}
+  }
+  h1{margin:0 0 6px;font-size:clamp(34px,7vw,70px);line-height:.9;letter-spacing:-2px}
+  .accent{color:#5de1ff}
+  button{pointer-events:auto;border:0;border-radius:14px;padding:14px 22px;font-weight:900;font-size:16px;cursor:pointer;background:#5de1ff;color:#051018;box-shadow:0 8px 24px rgba(93,225,255,.25)}
+  button:hover{transform:translateY(-1px)}
+  kbd{background:#152433;border:1px solid #2b4258;border-bottom-width:2px;border-radius:6px;padding:2px 6px}
+  #msg{position:absolute;top:32%;left:50%;transform:translate(-50%,-50%) scale(.92);font-size:clamp(28px,5vw,54px);font-weight:1000;opacity:0;transition:opacity .18s,transform .18s;text-align:center;letter-spacing:-1px}
+  #msg.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .stars{letter-spacing:5px;color:#ffd43b}
+
+  /* COMPACT LAPTOP UI */
+  .top{gap:8px;padding:8px}
+  .panel{border-radius:10px;padding:6px 9px;min-width:112px}
+  .big{font-size:21px}
+  .small{font-size:10px}
+  #heat{top:66px!important;left:8px!important;min-width:95px!important}
+  #driftStatus{top:66px!important;left:120px!important;min-width:82px!important}
+  #multiplierStatus{top:66px!important;left:219px!important;min-width:105px!important}
+  #comboStatus{top:66px!important;left:341px!important;min-width:78px!important}
+  #extractStatus{top:116px!important;left:8px!important;min-width:205px!important;max-width:330px}
+  #gunnerStatus{top:116px!important;right:8px!important;min-width:130px!important}
+  #healthWrap{bottom:10px;width:min(400px,58vw)}
+  #healthLabel{font-size:10px;margin-bottom:3px}
+  #healthOuter{height:12px}
+  #help{right:8px;bottom:7px;font-size:9px;line-height:1.35}
+  #msg{font-size:clamp(23px,4vw,42px)}
+  .card{width:min(560px,90vw);padding:18px;border-radius:16px}
+  h1{font-size:clamp(28px,5.5vw,52px)}
+  #upgradeShop{margin:10px 0 10px}
+  #vehicleChoice{margin:8px 0;padding:8px}
+  .vehicleButtons{gap:7px;margin-top:6px}
+  .upgradeHeader{gap:8px;margin-bottom:7px}
+  .upgradeGrid{gap:7px}
+  .upgradeItem{padding:8px;border-radius:10px}
+  .upgradeItem b{font-size:13px;margin-bottom:2px}
+  .upgradeItem .small{min-height:24px;margin-bottom:5px}
+  .upgradeItem button{padding:7px 9px;font-size:11px}
+  #upgradePoints{font-size:18px}
+  button{border-radius:10px;padding:10px 16px;font-size:13px}
+
+  @media(max-height:720px){
+    #help{display:none}
+    #healthWrap{width:min(360px,52vw)}
+    .card{padding:14px}
+    h1{font-size:34px}
+    #upgradeShop{margin:7px 0}
+    .upgradeItem .small{min-height:0}
+  }
+
+  @media(max-width:720px){
+    #comboStatus{display:none}
+    #multiplierStatus{left:215px!important}
+    #extractStatus{max-width:250px}
+    #gunnerStatus{top:165px!important;left:8px!important;right:auto!important;text-align:left!important}
+    #healthWrap{width:62vw}
+  }
+
+  @media(max-width:520px){
+    #driftStatus{left:112px!important}
+    #multiplierStatus{display:none}
+    #extractStatus{top:114px!important;max-width:210px}
+    #gunnerStatus{top:163px!important;min-width:115px!important}
+    .upgradeGrid{grid-template-columns:1fr}
+    .vehicleButtons{grid-template-columns:1fr}
+  }
+
+
+  #devMenu{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:min(420px,88vw);
+    background:rgba(5,12,20,.96);
+    border:1px solid rgba(93,225,255,.35);
+    border-radius:16px;
+    padding:16px;
+    color:white;
+    z-index:30;
+    display:none;
+    pointer-events:auto;
+    box-shadow:0 18px 70px rgba(0,0,0,.55);
+  }
+  #devMenu.open{display:block}
+  #devMenu h2{margin:0 0 4px;font-size:22px}
+  #devMenu .devRow{margin-top:12px}
+  #devMenu label{display:block;font-size:11px;font-weight:900;margin-bottom:5px;opacity:.82}
+  #devMenu input[type="number"]{
+    width:100%;
+    box-sizing:border-box;
+    background:#101d29;
+    color:white;
+    border:1px solid #294359;
+    border-radius:9px;
+    padding:9px 10px;
+    font-size:15px;
+  }
+  #devMenu input[type="range"]{width:100%}
+  #devMenu .devValue{font-size:12px;opacity:.8;margin-top:3px}
+  #devMenu .devButtons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  #devHint{
+    position:absolute;
+    left:8px;
+    bottom:8px;
+    font-size:9px;
+    opacity:.65;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="devMenu">
+  <h2>🛠 DEV MENU</h2>
+  <div class="small">Press F1 to open / close.</div>
+
+  <div class="devRow">
+    <label for="devScore">SCORE</label>
+    <input id="devScore" type="number" min="0" max="9999999" step="100" value="0">
+  </div>
+
+  <div class="devRow">
+    <label for="devMap">MAP</label>
+    <select id="devMap" style="width:100%;box-sizing:border-box;background:#101d29;color:white;border:1px solid #294359;border-radius:9px;padding:9px 10px;font-size:15px">
+      <option value="chase">🏙 Cop Chase</option>
+      <option value="range">🎯 Trench Air Range</option>
+    </select>
+  </div>
+
+  <div class="devRow">
+    <label for="devVehicle">VEHICLE</label>
+    <select id="devVehicle" style="width:100%;box-sizing:border-box;background:#101d29;color:white;border:1px solid #294359;border-radius:9px;padding:9px 10px;font-size:15px">
+      <option value="car">🚗 Car</option>
+      <option value="helicopter">🚁 Helicopter</option>
+      <option value="jet">✈️ Jet</option>
+      <option value="bomber">🛩️ Bomber</option>
+    </select>
+  </div>
+
+  <div class="devRow">
+    <label for="devSpeed">SPEED (KM/H)</label>
+    <input id="devSpeed" type="range" min="0" max="500" step="5" value="0">
+    <div id="devSpeedValue" class="devValue">Normal speed</div>
+  </div>
+
+  <div class="devButtons">
+    <button id="devApply">APPLY</button>
+    <button id="devResetSpeed">NORMAL SPEED</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="devHint">F1 DEV MENU</div>
+  <div class="top">
+    <div class="panel"><div class="small">SCORE</div><div id="score" class="big">0</div></div>
+    <div class="panel" style="text-align:right"><div class="small">SPEED</div><div><span id="speed" class="big">0</span> <span class="small">km/h</span></div></div>
+  </div>
+  <div id="heat" class="panel"><div class="small">WANTED</div><div id="stars" class="stars">★</div></div>
+  <div id="driftStatus" class="panel" style="position:absolute;top:92px;left:190px;min-width:110px">
+    <div class="small">DRIFT MODE</div>
+    <div id="driftText" style="font-weight:900">ON</div>
+  </div>
+  <div id="multiplierStatus" class="panel" style="position:absolute;top:92px;left:332px;min-width:110px">
+    <div class="small">SCORE MULTIPLIER</div>
+    <div id="multiplierText" style="font-weight:900">1×</div>
+  </div>
+  <div id="comboStatus" class="panel" style="position:absolute;top:92px;left:494px;min-width:90px">
+    <div class="small">ANKLE COMBO</div>
+    <div id="comboText" style="font-weight:900">0</div>
+  </div>
+  <div id="extractStatus" class="panel" style="display:none;position:absolute;top:154px;left:14px;min-width:230px">
+    <div class="small">EXTRACTION</div>
+    <div id="extractText" style="font-weight:900">⭐ ESCAPE OBJECTIVE</div>
+  </div>
+  <div id="gunnerStatus" class="panel" style="position:absolute;top:154px;right:14px;min-width:150px;text-align:right">
+    <div class="small">FRONT GUNNER • E</div>
+    <div id="gunnerText" style="font-weight:900">LOCKED</div>
+  </div>
+  <div id="msg"></div>
+  <div id="healthWrap">
+    <div id="healthLabel"><span>CAR CONDITION</span><span id="healthText">100%</span></div>
+    <div id="healthOuter"><div id="healthBar"></div></div>
+  </div>
+  <div id="help">
+    <b>WASD / ARROWS</b> drive<br>
+    <b>SPACE</b> car drift / heli climb<br>
+    <b>SHIFT</b> infinite boost<br>
+    <b>E</b> front gunner<br>
+    <b>R</b> restart
+  </div>
+</div>
+
+<div id="start">
+  <div class="card">
+    <h1>NEON <span class="accent">PURSUIT</span></h1>
+    <p>Arcade 3D chase on a normal city baseplate. Reach <b>10,000 score</b> to unlock the glowing ⭐ escape objective.</p>
+    <p><kbd>W</kbd> accelerate &nbsp; <kbd>S</kbd> brake/reverse &nbsp; <kbd>A/D</kbd> steer &nbsp; <kbd>SPACE</kbd> drift toggle &nbsp; <kbd>SHIFT</kbd> boost</p>
+    <button id="playBtn">START CHASE</button>
+    <p class="small">Tip: reach 10,000 score and a MASSIVE glowing checkpoint, runway, and cargo plane will appear.</p>
+  </div>
+</div>
+
+<div id="gameover">
+  <div class="card">
+    <h1 id="gameoverTitle">CHASE <span class="accent">OVER</span></h1>
+    <p id="finalText">Score: 0</p>
+
+    <div id="upgradeShop">
+      <div class="upgradeHeader">
+        <div>
+          <b>GARAGE UPGRADES</b>
+          <div class="small">Upgrades stay for your next runs.</div>
+        </div>
+        <div><span id="upgradePoints">0</span> <span class="small">POINTS</span></div>
+      </div>
+
+      <div id="fleetUnlock" style="margin-bottom:12px;padding:12px;border-radius:14px;background:rgba(93,225,255,.08);border:1px solid rgba(93,225,255,.22)">
+        <b>POLICE FLEET</b>
+        <div id="fleetText" class="small">Current fleet: Patrol Sedan</div>
+      </div>
+
+      <div id="vehicleChoice">
+        <b>CHOOSE NEXT VEHICLE</b>
+        <div class="small">Unlocked after 3 completed runs.</div>
+        <div class="vehicleButtons">
+          <button class="vehicleBtn" data-vehicle="car">🚗 CAR</button>
+          <button class="vehicleBtn" data-vehicle="helicopter">🚁 HELICOPTER</button>
+        </div>
+        <div id="vehicleHelp" class="small" style="margin-top:8px">Car: drift + front gunner. Helicopter: fly over the city and press B to drop bombs.</div>
+      </div>
+
+      <div class="upgradeGrid">
+        <div class="upgradeItem">
+          <b>ENGINE <span id="engineLevel">Lv. 0</span></b>
+          <span class="small">Higher top speed.</span>
+          <button class="upgradeBtn" data-upgrade="engine">UPGRADE — 1 POINT</button>
+        </div>
+
+        <div class="upgradeItem">
+          <b>ACCELERATION <span id="accelLevel">Lv. 0</span></b>
+          <span class="small">Reach top speed faster.</span>
+          <button class="upgradeBtn" data-upgrade="accel">UPGRADE — 1 POINT</button>
+        </div>
+
+        <div class="upgradeItem">
+          <b>ARMOR <span id="armorLevel">Lv. 0</span></b>
+          <span class="small">More car condition each run.</span>
+          <button class="upgradeBtn" data-upgrade="armor">UPGRADE — 1 POINT</button>
+        </div>
+
+        <div class="upgradeItem">
+          <b>NITRO <span id="nitroLevel">Lv. 0</span></b>
+          <span class="small">Makes infinite boost stronger.</span>
+          <button class="upgradeBtn" data-upgrade="nitro">UPGRADE — 1 POINT</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="restartBtn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+let scene, camera, renderer, player, ground, skyDome;
+let cops = [], obstacles = [], roadMarks = [], buildings = [], skidMarks = [], bullets = [], bombs = [], missiles = [], explosions = [];
+let roadStrips = [], cityCells = [];
+let objectiveStar = null, runwayGroup = null, massiveCheckpoint = null;
+let bombReticle = null;
+let objectivePos = new THREE.Vector3();
+let runwayCenter = new THREE.Vector3();
+let runwayYaw = 0;
+let runwayHorizontal = false;
+let objectiveReached = false;
+const ROAD_SPACING = 68;
+let keys = {};
+let running = false, health = 100, score = 0, heat = 1;
+let velocity = 0, steer = 0, boost = 100, lastTime = performance.now();
+
+let upgradePoints = 0;
+let upgrades = {engine:0, accel:0, armor:0, nitro:0};
+let maxHealth = 100;
+let maxBoost = 100;
+let runRewarded = false;
+let gunnerLevel = 0;
+let gunCooldown = 0;
+let aircraftGunCooldown = 0;
+let machineGunHeld = false;
+let selectedVehicle = 'car';
+let currentMap = 'chase';
+let cameraViewMode = 0; // 0 = normal, 1 = cockpit
+let trainingTargets = [];
+let enemyPlanes = [];
+let rangeDecor = [];
+const ENEMY_BASE_MAX_HP = 1000;
+let enemyBase = null;
+let enemyBaseRespawnTimer = 0;
+let enemyBaseDestroyedCount = 0;
+let rangeTargetsDestroyed = 0;
+let bombCooldown = 0;
+const BOMBER_MAX_BOMBS = 6;
+let bomberBombAmmo = BOMBER_MAX_BOMBS;
+let bomberReloadTimer = 0;
+let missileCooldown = 0;
+let jetTargetReticle = null;
+let devMenuOpen = false;
+let devSpeedKmh = 0; // 0 = normal game speed
+
+// Every successful extraction permanently expands the police fleet
+// for this play session.
+let runsBeaten = 0;
+const policeFleet = [
+  {id:'sedan', name:'Patrol Sedan', speed:1.00, damage:1.00},
+  {id:'suv', name:'Police SUV', speed:0.94, damage:1.30},
+  {id:'interceptor', name:'Highway Interceptor', speed:1.22, damage:1.05},
+  {id:'armored', name:'Armored Response Van', speed:0.86, damage:1.65},
+  {id:'muscle', name:'Pursuit Muscle Car', speed:1.13, damage:1.22},
+  {id:'heavy', name:'Heavy Police Truck', speed:0.82, damage:1.90},
+  {id:'elite', name:'Elite Pursuit Unit', speed:1.30, damage:1.45}
+];
+let driftEnabled = true;
+let skidTimer = 0;
+let ankleMultiplierTimer = 0;
+let ankleCombo = 0;
+let ankleComboTimer = 0;
+let cameraPunch = 0;
+let extractionStarted = false;
+let extractionComplete = false;
+let cargoPlane = null;
+let cargoTarget = null;
+let cargoRampTrigger = null;
+let cargoTaxiSpeed = 0;
+let escapeCutscene = false;
+let cutsceneTimer = 0;
+let copSpawnTimer = 0, scoreTimer = 0, messageTimer = 0;
+const clock = new THREE.Clock();
+
+const ui = {
+  score: document.getElementById('score'),
+  speed: document.getElementById('speed'),
+  healthBar: document.getElementById('healthBar'),
+  healthText: document.getElementById('healthText'),
+  stars: document.getElementById('stars'),
+  driftText: document.getElementById('driftText'),
+  multiplierText: document.getElementById('multiplierText'),
+  comboText: document.getElementById('comboText'),
+  extractStatus: document.getElementById('extractStatus'),
+  extractText: document.getElementById('extractText'),
+  start: document.getElementById('start'),
+  gameover: document.getElementById('gameover'),
+  gameoverTitle: document.getElementById('gameoverTitle'),
+  finalText: document.getElementById('finalText'),
+  upgradeShop: document.getElementById('upgradeShop'),
+  upgradePoints: document.getElementById('upgradePoints'),
+  engineLevel: document.getElementById('engineLevel'),
+  accelLevel: document.getElementById('accelLevel'),
+  armorLevel: document.getElementById('armorLevel'),
+  nitroLevel: document.getElementById('nitroLevel'),
+  fleetText: document.getElementById('fleetText'),
+  vehicleChoice: document.getElementById('vehicleChoice'),
+  vehicleHelp: document.getElementById('vehicleHelp'),
+  gunnerText: document.getElementById('gunnerText'),
+  msg: document.getElementById('msg'),
+  devMenu: document.getElementById('devMenu'),
+  devScore: document.getElementById('devScore'),
+  devMap: document.getElementById('devMap'),
+  devVehicle: document.getElementById('devVehicle'),
+  devSpeed: document.getElementById('devSpeed'),
+  devSpeedValue: document.getElementById('devSpeedValue'),
+};
+
+
+function makeProceduralGroundTexture(){
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#7a6d4b';
+  ctx.fillRect(0,0,256,256);
+
+  // Layered soil/grass speckle.
+  for(let i=0;i<5200;i++){
+    const x=Math.random()*256;
+    const y=Math.random()*256;
+    const size=Math.random()*2.2+.35;
+    const shade=Math.floor(70+Math.random()*65);
+    ctx.fillStyle=`rgba(${shade},${Math.floor(shade*.9)},${Math.floor(shade*.58)},${.05+Math.random()*.11})`;
+    ctx.fillRect(x,y,size,size);
+  }
+
+  // Faint dirt streaks.
+  ctx.globalAlpha=.12;
+  for(let i=0;i<28;i++){
+    ctx.strokeStyle = i%2 ? '#3a3325' : '#b5a06d';
+    ctx.lineWidth = 1+Math.random()*2;
+    ctx.beginPath();
+    const y=Math.random()*256;
+    ctx.moveTo(0,y);
+    ctx.bezierCurveTo(70,y+Math.random()*20-10,180,y+Math.random()*20-10,256,y+Math.random()*8-4);
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(28,28);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.() || 4);
+  return tex;
+}
+
+function makeSkyDome(){
+  const mat = new THREE.ShaderMaterial({
+    side:THREE.BackSide,
+    depthWrite:false,
+    uniforms:{
+      topColor:{value:new THREE.Color(0x4f8fb3)},
+      bottomColor:{value:new THREE.Color(0xcfe5ed)},
+      offset:{value:35},
+      exponent:{value:.85}
+    },
+    vertexShader:`
+      varying vec3 vWorldPosition;
+      void main(){
+        vec4 worldPosition = modelMatrix * vec4(position,1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      uniform float offset;
+      uniform float exponent;
+      varying vec3 vWorldPosition;
+      void main(){
+        float h = normalize(vWorldPosition + vec3(0.0,offset,0.0)).y;
+        float f = max(pow(max(h,0.0),exponent),0.0);
+        gl_FragColor = vec4(mix(bottomColor,topColor,f),1.0);
+      }
+    `
+  });
+
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(700,24,16),mat);
+  mesh.frustumCulled=false;
+  scene.add(mesh);
+  return mesh;
+}
+
+function setSkyPalette(mode){
+  if(!skyDome) return;
+  if(mode === 'range'){
+    skyDome.material.uniforms.topColor.value.setHex(0x6f7472);
+    skyDome.material.uniforms.bottomColor.value.setHex(0xb6aa8c);
+    skyDome.material.uniforms.exponent.value = 1.15;
+  } else {
+    skyDome.material.uniforms.topColor.value.setHex(0x4f8fb3);
+    skyDome.material.uniforms.bottomColor.value.setHex(0xcfe5ed);
+    skyDome.material.uniforms.exponent.value = .85;
+  }
+}
+
+function makeBattlefieldSmoke(x,z,scale=1){
+  const g = new THREE.Group();
+  const smokeMat = new THREE.MeshStandardMaterial({
+    color:0x47433d,
+    roughness:1,
+    transparent:true,
+    opacity:.34,
+    depthWrite:false
+  });
+
+  for(let i=0;i<5;i++){
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry((2.0+i*.7)*scale,8,7),
+      smokeMat.clone()
+    );
+    puff.position.set(
+      (Math.random()-.5)*2.5*scale,
+      (3.5+i*3.0)*scale,
+      (Math.random()-.5)*2.5*scale
+    );
+    puff.scale.set(1.2,1,.9);
+    g.add(puff);
+  }
+
+  g.position.set(x,0,z);
+  g.userData.smokeColumn=true;
+  g.userData.phase=Math.random()*6.28;
+  scene.add(g);
+  rangeDecor.push(g);
+  return g;
+}
+
+function updateRangeAtmosphere(t){
+  if(currentMap !== 'range') return;
+  for(const d of rangeDecor){
+    if(!d.userData.smokeColumn) continue;
+    const phase=d.userData.phase||0;
+    d.children.forEach((p,i)=>{
+      p.position.x += Math.sin(t*.45+phase+i*.7)*.002;
+      p.position.y += Math.sin(t*.65+phase+i*.5)*.0015;
+      if(p.material) p.material.opacity=.24 + Math.sin(t*.7+phase+i)*.05;
+    });
+  }
+}
+
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8fc8e8);
+  scene.fog = new THREE.Fog(0x8fc8e8, 120, 430);
+
+  camera = new THREE.PerspectiveCamera(68, innerWidth/innerHeight, 0.1, 1000);
+  camera.position.set(0, 6.5, 13);
+
+  renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.45));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  document.body.appendChild(renderer.domElement);
+
+  const hemi = new THREE.HemisphereLight(0xe5f3ff, 0x4c483c, 1.35);
+  scene.add(hemi);
+
+  const ambient = new THREE.AmbientLight(0xbfd2df,.32);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(0xfff2d4, 3.0);
+  sun.position.set(70,105,45);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1536,1536);
+  sun.shadow.camera.left = -115; sun.shadow.camera.right = 115;
+  sun.shadow.camera.top = 115; sun.shadow.camera.bottom = -115;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 260;
+  sun.shadow.bias = -.00025;
+  scene.add(sun);
+
+  ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(900,900,1,1),
+    new THREE.MeshStandardMaterial({
+      color:0x7f8a59,
+      map:makeProceduralGroundTexture(),
+      roughness:.98,
+      metalness:0
+    })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  skyDome = makeSkyDome();
+  setSkyPalette('chase');
+
+  buildCity();
+  player = makeCar(0x1f6bff, false);
+  player.position.set(0,.45,0);
+  scene.add(player);
+  bombReticle = makeBombReticle();
+  jetTargetReticle = makeJetTargetReticle();
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', e => {
+    if(e.code === 'F1' && !e.repeat){
+      e.preventDefault();
+      toggleDevMenu();
+      return;
+    }
+
+    // Don't drive the vehicle while typing in the dev menu.
+    if(devMenuOpen && e.code !== 'Escape'){
+      return;
+    }
+    if(e.code === 'Escape' && devMenuOpen){
+      e.preventDefault();
+      toggleDevMenu();
+      return;
+    }
+
+    if(e.code === 'Space'){
+      e.preventDefault();
+
+      if(selectedVehicle === 'helicopter' || selectedVehicle === 'jet' || selectedVehicle === 'bomber'){
+        keys[e.code] = true;
+        return;
+      }
+
+      if(!e.repeat){
+        driftEnabled = !driftEnabled;
+        showMessage(driftEnabled ? 'DRIFT ON' : 'DRIFT OFF');
+        updateHUD();
+      }
+      return;
+    }
+    if(e.code === 'KeyC' && !e.repeat){
+      e.preventDefault();
+      cameraViewMode = cameraViewMode ? 0 : 1;
+      showMessage(cameraViewMode ? 'COCKPIT VIEW' : 'NORMAL VIEW');
+      return;
+    }
+
+    if(e.code === 'KeyE' && !e.repeat){
+      e.preventDefault();
+      if(selectedVehicle === 'jet') fireJetMissile();
+      else fireGunner();
+      return;
+    }
+    if(e.code === 'KeyB' && !e.repeat){
+      e.preventDefault();
+      dropBomb();
+      return;
+    }
+    keys[e.code] = true;
+    if(e.code === 'KeyR') resetGame();
+  });
+  window.addEventListener('keyup', e => keys[e.code] = false);
+
+  window.addEventListener('mousedown', e => {
+    if(e.button !== 0 || devMenuOpen) return;
+    if(selectedVehicle === 'jet' || selectedVehicle === 'bomber'){
+      e.preventDefault();
+      machineGunHeld = true;
+    }
+  });
+
+  window.addEventListener('mouseup', e => {
+    if(e.button === 0) machineGunHeld = false;
+  });
+
+  window.addEventListener('blur', () => {
+    machineGunHeld = false;
+  });
+
+  animate();
+}
+
+function box(w,h,d,color, metal=0, rough=.7){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color, metalness:metal, roughness:rough}));
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+function makeCar(color, police=false){
+  const g = new THREE.Group();
+  const body = box(2.15,.58,4.1,color, .25,.35);
+  body.position.y=.58;
+  g.add(body);
+  const hood = box(1.95,.28,1.1,color,.25,.35); hood.position.set(0,.85,-1.2); g.add(hood);
+  const cabin = box(1.65,.72,1.85, police?0xdde8f4:0x16324a,.05,.2); cabin.position.set(0,1.06,.28); g.add(cabin);
+
+  const glassMat = new THREE.MeshStandardMaterial({color:0x8bd3ff, roughness:.1, metalness:.05, transparent:true, opacity:.72});
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.42,.45,.08), glassMat);
+  windshield.rotation.x = -.24; windshield.position.set(0,1.11,-.71); g.add(windshield);
+  const rear = windshield.clone(); rear.rotation.x=.24; rear.position.z=1.26; g.add(rear);
+
+  const wheelMat = new THREE.MeshStandardMaterial({color:0x111111, roughness:.9});
+  for(const sx of [-1,1]) for(const sz of [-1.25,1.28]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.38,16), wheelMat);
+    w.rotation.z=Math.PI/2; w.position.set(sx*1.12,.42,sz); w.castShadow=true; g.add(w);
+  }
+
+  const headMat = new THREE.MeshStandardMaterial({color:0xfff1b3, emissive:0xffd77a, emissiveIntensity:1.8});
+  for(const x of [-.62,.62]){ const l=box(.42,.16,.08,0xfff0b0); l.material=headMat; l.position.set(x,.66,-2.08); g.add(l); }
+  const tailMat = new THREE.MeshStandardMaterial({color:0xff2f4e, emissive:0xaa001d, emissiveIntensity:1.8});
+  for(const x of [-.62,.62]){ const l=box(.42,.16,.08,0xff2f4e); l.material=tailMat; l.position.set(x,.66,2.08); g.add(l); }
+
+  if(police){
+    const whiteDoorL = box(.08,.42,1.25,0xffffff); whiteDoorL.position.set(-1.1,.72,.1); g.add(whiteDoorL);
+    const whiteDoorR = box(.08,.42,1.25,0xffffff); whiteDoorR.position.set(1.1,.72,.1); g.add(whiteDoorR);
+    const bar = box(1.25,.12,.28,0x222222); bar.position.set(0,1.56,.25); g.add(bar);
+    const red = box(.52,.12,.24,0xff1f32); red.position.set(-.32,1.63,.25); red.material.emissive = new THREE.Color(0xff001d); red.material.emissiveIntensity=2.5; g.add(red);
+    const blue = box(.52,.12,.24,0x199cff); blue.position.set(.32,1.63,.25); blue.material.emissive = new THREE.Color(0x0066ff); blue.material.emissiveIntensity=2.5; g.add(blue);
+    g.userData.siren = [red,blue];
+  }
+
+  g.userData.velocity = 0;
+  g.userData.hitCooldown = 0;
+  g.userData.ankleArmed = 0;
+  g.userData.ankleCooldown = 0;
+  return g;
+}
+
+
+function makeBombReticle(){
+  const g = new THREE.Group();
+
+  const outer = new THREE.Mesh(
+    new THREE.RingGeometry(2.8, 3.6, 40),
+    new THREE.MeshBasicMaterial({
+      color:0xffe45c,
+      transparent:true,
+      opacity:.95,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  outer.rotation.x = -Math.PI/2;
+  g.add(outer);
+
+  const inner = new THREE.Mesh(
+    new THREE.RingGeometry(1.2, 1.5, 28),
+    new THREE.MeshBasicMaterial({
+      color:0xff6a3d,
+      transparent:true,
+      opacity:.95,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  inner.rotation.x = -Math.PI/2;
+  inner.position.y = .02;
+  g.add(inner);
+
+  const lineMat = new THREE.MeshBasicMaterial({
+    color:0xffffff,
+    transparent:true,
+    opacity:.92,
+    depthWrite:false,
+    side:THREE.DoubleSide
+  });
+
+  const hLine = new THREE.Mesh(new THREE.PlaneGeometry(5.2,.16), lineMat);
+  hLine.rotation.x = -Math.PI/2;
+  hLine.position.y = .03;
+  g.add(hLine);
+
+  const vLine = new THREE.Mesh(new THREE.PlaneGeometry(.16,5.2), lineMat);
+  vLine.rotation.x = -Math.PI/2;
+  vLine.position.y = .03;
+  g.add(vLine);
+
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+
+function makeHelicopter(){
+  const g = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x296b89,metalness:.28,roughness:.38});
+  const darkMat = new THREE.MeshStandardMaterial({color:0x171c22,metalness:.6,roughness:.32});
+  const glassMat = new THREE.MeshStandardMaterial({color:0x86d8ff,transparent:true,opacity:.72,roughness:.12});
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.5,4.7),bodyMat);
+  body.position.y = 1.8;
+  body.castShadow = true;
+  g.add(body);
+
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.0,1.0,1.7),glassMat);
+  cockpit.position.set(0,2.1,-1.6);
+  cockpit.rotation.x = -.15;
+  g.add(cockpit);
+
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(.55,.65,4.4),bodyMat);
+  tail.position.set(0,2.0,4.25);
+  tail.rotation.x = .08;
+  g.add(tail);
+
+  const tailFin = new THREE.Mesh(new THREE.BoxGeometry(.35,2.2,1.5),bodyMat);
+  tailFin.position.set(0,3.0,6.0);
+  g.add(tailFin);
+
+  const skid1 = new THREE.Mesh(new THREE.BoxGeometry(.12,.12,4.2),darkMat);
+  skid1.position.set(-1.15,.7,.2); g.add(skid1);
+  const skid2 = skid1.clone();
+  skid2.position.x = 1.15; g.add(skid2);
+
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.7,10),darkMat);
+  mast.position.set(0,3.0,0); g.add(mast);
+
+  const rotor = new THREE.Group();
+  const blade1 = new THREE.Mesh(new THREE.BoxGeometry(8.5,.09,.24),darkMat);
+  rotor.add(blade1);
+  const blade2 = new THREE.Mesh(new THREE.BoxGeometry(.24,.09,8.5),darkMat);
+  rotor.add(blade2);
+  rotor.position.set(0,3.45,0);
+  g.add(rotor);
+
+  const tailRotor = new THREE.Group();
+  const tb1 = new THREE.Mesh(new THREE.BoxGeometry(.08,2.0,.22),darkMat);
+  tailRotor.add(tb1);
+  const tb2 = new THREE.Mesh(new THREE.BoxGeometry(.08,.22,2.0),darkMat);
+  tailRotor.add(tb2);
+  tailRotor.position.set(.38,2.8,6.15);
+  g.add(tailRotor);
+
+  g.userData.mainRotor = rotor;
+  g.userData.tailRotor = tailRotor;
+  g.userData.moveDir = new THREE.Vector3(0,0,1);
+
+  return g;
+}
+
+
+
+function makeJetTargetReticle(){
+  const g = new THREE.Group();
+
+  const outer = new THREE.Mesh(
+    new THREE.RingGeometry(5.5, 6.6, 48),
+    new THREE.MeshBasicMaterial({
+      color:0xff5f4a,
+      transparent:true,
+      opacity:.95,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  outer.rotation.x = -Math.PI/2;
+  g.add(outer);
+
+  const inner = new THREE.Mesh(
+    new THREE.RingGeometry(2.3, 2.8, 36),
+    new THREE.MeshBasicMaterial({
+      color:0xffdd55,
+      transparent:true,
+      opacity:.95,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  inner.rotation.x = -Math.PI/2;
+  inner.position.y = .02;
+  g.add(inner);
+
+  const lineMat = new THREE.MeshBasicMaterial({
+    color:0xffffff,
+    transparent:true,
+    opacity:.9,
+    side:THREE.DoubleSide,
+    depthWrite:false
+  });
+
+  const h = new THREE.Mesh(new THREE.PlaneGeometry(10,.20), lineMat);
+  h.rotation.x = -Math.PI/2;
+  h.position.y = .03;
+  g.add(h);
+
+  const v = new THREE.Mesh(new THREE.PlaneGeometry(.20,10), lineMat);
+  v.rotation.x = -Math.PI/2;
+  v.position.y = .03;
+  g.add(v);
+
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+
+function makeJet(){
+  const g = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color:0x4e5965,
+    metalness:.55,
+    roughness:.32
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color:0x171c22,
+    metalness:.75,
+    roughness:.28
+  });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color:0x80d7ff,
+    transparent:true,
+    opacity:.72,
+    roughness:.10
+  });
+
+  const fuselage = new THREE.Mesh(
+    new THREE.BoxGeometry(2.0,1.3,8.5),
+    bodyMat
+  );
+  fuselage.position.y = 1.5;
+  fuselage.castShadow = true;
+  g.add(fuselage);
+
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(1.0,3.4,12),
+    bodyMat
+  );
+  nose.rotation.x = -Math.PI/2;
+  nose.position.set(0,1.5,-5.8);
+  nose.castShadow = true;
+  g.add(nose);
+
+  const cockpit = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4,.75,1.8),
+    glassMat
+  );
+  cockpit.position.set(0,2.0,-2.3);
+  cockpit.rotation.x = -.12;
+  g.add(cockpit);
+
+  const wings = new THREE.Mesh(
+    new THREE.BoxGeometry(8.5,.28,3.2),
+    bodyMat
+  );
+  wings.position.set(0,1.45,.2);
+  wings.castShadow = true;
+  g.add(wings);
+
+  const tailWing = new THREE.Mesh(
+    new THREE.BoxGeometry(4.0,.20,1.8),
+    bodyMat
+  );
+  tailWing.position.set(0,2.0,3.5);
+  g.add(tailWing);
+
+  const fin = new THREE.Mesh(
+    new THREE.BoxGeometry(.28,2.3,1.8),
+    bodyMat
+  );
+  fin.position.set(0,2.8,3.7);
+  g.add(fin);
+
+  // Twin engines.
+  for(const x of [-.65,.65]){
+    const eng = new THREE.Mesh(
+      new THREE.CylinderGeometry(.42,.52,2.5,12),
+      darkMat
+    );
+    eng.rotation.x = Math.PI/2;
+    eng.position.set(x,1.25,3.6);
+    g.add(eng);
+
+    const glow = new THREE.Mesh(
+      new THREE.CircleGeometry(.32,12),
+      new THREE.MeshBasicMaterial({color:0xffa22c})
+    );
+    glow.position.set(x,1.25,4.88);
+    glow.rotation.x = Math.PI/2;
+    g.add(glow);
+  }
+
+  g.userData.moveDir = new THREE.Vector3(0,0,1);
+
+  // Jet-shaped gameplay hitbox.
+  // Uses separate fuselage / wing / tail zones instead of a tiny round car hitbox.
+  g.userData.jetHitbox = {
+    bodyHalfWidth: 1.35,
+    noseZ: -7.4,
+    tailZ: 5.0,
+    wingHalfWidth: 4.55,
+    wingMinZ: -1.7,
+    wingMaxZ: 1.9,
+    tailHalfWidth: 2.35,
+    tailMinZ: 2.6,
+    tailMaxZ: 4.7,
+    verticalHalfHeight: 1.65
+  };
+
+  return g;
+}
+
+
+function makeBomber(){
+  const g = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color:0x4d5746,
+    metalness:.48,
+    roughness:.34
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color:0x20251f,
+    metalness:.62,
+    roughness:.30
+  });
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color:0x84c6d8,
+    transparent:true,
+    opacity:.58,
+    roughness:.08,
+    metalness:.05,
+    transmission:.18,
+    thickness:.15
+  });
+
+  // Long fuselage.
+  const fuselage = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5,1.7,11.5),
+    bodyMat
+  );
+  fuselage.position.y = 1.8;
+  fuselage.castShadow = true;
+  g.add(fuselage);
+
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(1.25,3.0,12),
+    bodyMat
+  );
+  nose.rotation.x = -Math.PI/2;
+  nose.position.set(0,1.8,-7.2);
+  g.add(nose);
+
+  const cockpit = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7,.85,1.7),
+    glassMat
+  );
+  cockpit.position.set(0,2.45,-3.8);
+  g.add(cockpit);
+
+  // Wide bomber wings.
+  const wings = new THREE.Mesh(
+    new THREE.BoxGeometry(15.0,.34,3.8),
+    bodyMat
+  );
+  wings.position.set(0,1.75,-.2);
+  wings.castShadow = true;
+  g.add(wings);
+
+  const tailWing = new THREE.Mesh(
+    new THREE.BoxGeometry(6.0,.24,2.0),
+    bodyMat
+  );
+  tailWing.position.set(0,2.15,4.8);
+  g.add(tailWing);
+
+  const fin = new THREE.Mesh(
+    new THREE.BoxGeometry(.32,2.8,2.1),
+    bodyMat
+  );
+  fin.position.set(0,3.2,5.1);
+  g.add(fin);
+
+  // Four engine pods.
+  for(const x of [-5.2,-2.2,2.2,5.2]){
+    const eng = new THREE.Mesh(
+      new THREE.CylinderGeometry(.55,.65,2.7,12),
+      darkMat
+    );
+    eng.rotation.x = Math.PI/2;
+    eng.position.set(x,1.45,.1);
+    g.add(eng);
+
+    const prop = new THREE.Group();
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(2.4,.08,.18),darkMat);
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(.18,.08,2.4),darkMat);
+    prop.add(p1,p2);
+    prop.position.set(x,1.45,-1.38);
+    g.add(prop);
+
+    if(!g.userData.props) g.userData.props=[];
+    g.userData.props.push(prop);
+  }
+
+  // Bomb bay detail underneath.
+  const bay = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8,.22,3.6),
+    darkMat
+  );
+  bay.position.set(0,.85,.8);
+  g.add(bay);
+
+  // Extra surface details for a more finished aircraft silhouette.
+  const stripeMat = new THREE.MeshStandardMaterial({
+    color:0xb9b59d,
+    metalness:.35,
+    roughness:.35
+  });
+
+  const wingStripeL = new THREE.Mesh(new THREE.BoxGeometry(2.2,.04,3.55),stripeMat);
+  wingStripeL.position.set(-4.0,1.95,-.2);
+  g.add(wingStripeL);
+  const wingStripeR = wingStripeL.clone();
+  wingStripeR.position.x=4.0;
+  g.add(wingStripeR);
+
+  const dorsal = new THREE.Mesh(
+    new THREE.BoxGeometry(.55,.58,2.2),
+    darkMat
+  );
+  dorsal.position.set(0,2.72,1.1);
+  g.add(dorsal);
+
+  const belly = new THREE.Mesh(
+    new THREE.CylinderGeometry(.35,.35,1.0,12),
+    darkMat
+  );
+  belly.rotation.x=Math.PI/2;
+  belly.position.set(0,.75,2.8);
+  g.add(belly);
+
+  // Propeller blur discs make spinning props look smoother in motion.
+  if(g.userData.props){
+    for(const prop of g.userData.props){
+      const disc = new THREE.Mesh(
+        new THREE.CircleGeometry(1.25,24),
+        new THREE.MeshBasicMaterial({
+          color:0x9da5a8,
+          transparent:true,
+          opacity:.12,
+          side:THREE.DoubleSide,
+          depthWrite:false
+        })
+      );
+      disc.rotation.y=Math.PI/2;
+      prop.add(disc);
+    }
+  }
+
+  g.userData.moveDir = new THREE.Vector3(0,0,1);
+
+  // Large aircraft collision shape.
+  g.userData.jetHitbox = {
+    bodyHalfWidth: 1.7,
+    noseZ: -8.6,
+    tailZ: 6.4,
+    wingHalfWidth: 7.7,
+    wingMinZ: -2.3,
+    wingMaxZ: 2.0,
+    tailHalfWidth: 3.3,
+    tailMinZ: 3.5,
+    tailMaxZ: 6.2,
+    verticalHalfHeight: 1.9
+  };
+
+  return g;
+}
+
+function rebuildPlayerVehicle(){
+  const oldPos = player ? player.position.clone() : new THREE.Vector3(0,.45,0);
+  const oldRot = player ? player.rotation.y : 0;
+
+  if(player) scene.remove(player);
+
+  if(selectedVehicle === 'helicopter'){
+    player = makeHelicopter();
+    player.position.set(oldPos.x,7.0,oldPos.z);
+  } else if(selectedVehicle === 'jet'){
+    player = makeJet();
+    player.position.set(oldPos.x,10.0,oldPos.z);
+  } else if(selectedVehicle === 'bomber'){
+    player = makeBomber();
+    player.position.set(oldPos.x,14.0,oldPos.z);
+  } else {
+    player = makeCar(0x1f6bff,false);
+    player.position.set(oldPos.x,.45,oldPos.z);
+  }
+
+  player.rotation.y = oldRot;
+
+  player.traverse(o=>{
+    if(o.isMesh){
+      o.castShadow = true;
+      if(o.geometry && o.material && !o.material.transparent) o.receiveShadow = true;
+    }
+  });
+
+  scene.add(player);
+  refreshGunner();
+}
+
+function refreshGunner(){
+  gunnerLevel = Math.floor(runsBeaten / 2);
+
+  if(!player) return;
+
+  if(selectedVehicle === 'helicopter' || selectedVehicle === 'jet' || selectedVehicle === 'bomber'){
+    if(player.userData.gunner){
+      player.remove(player.userData.gunner);
+      player.userData.gunner = null;
+    }
+    return;
+  }
+
+  if(player.userData.gunner){
+    player.remove(player.userData.gunner);
+    player.userData.gunner = null;
+  }
+
+  if(gunnerLevel <= 0) return;
+
+  // Small arcade front turret mounted on the hood.
+  const turret = new THREE.Group();
+
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(.32,.38,.22,12),
+    new THREE.MeshStandardMaterial({color:0x252b31,metalness:.65,roughness:.35})
+  );
+  base.position.set(0,1.12,-1.18);
+  turret.add(base);
+
+  const barrel = new THREE.Mesh(
+    new THREE.BoxGeometry(.14,.14,1.25),
+    new THREE.MeshStandardMaterial({color:0x15191d,metalness:.8,roughness:.25})
+  );
+  barrel.position.set(0,1.26,-1.82);
+  turret.add(barrel);
+
+  const sight = new THREE.Mesh(
+    new THREE.BoxGeometry(.16,.12,.18),
+    new THREE.MeshStandardMaterial({color:0x5de1ff,emissive:0x2dbad9,emissiveIntensity:2})
+  );
+  sight.position.set(0,1.40,-1.38);
+  turret.add(sight);
+
+  // Higher levels add tiny side details so upgrades are visible.
+  for(let i=1;i<Math.min(gunnerLevel,5);i++){
+    const detail = new THREE.Mesh(
+      new THREE.BoxGeometry(.10,.10,.45),
+      new THREE.MeshStandardMaterial({color:0x303942,metalness:.7,roughness:.3})
+    );
+    detail.position.set((i%2 ? .22 : -.22),1.18,-1.55-(i*.05));
+    turret.add(detail);
+  }
+
+  player.add(turret);
+  player.userData.gunner = turret;
+}
+
+function fireGunner(){
+  if(!running || extractionComplete) return;
+
+  if(selectedVehicle === 'helicopter'){
+    showMessage('HELICOPTER WEAPON: PRESS B');
+    return;
+  }
+
+  if(selectedVehicle === 'jet'){
+    showMessage('JET: HOLD LMB FOR MACHINE GUN • E MISSILES');
+    return;
+  }
+
+  if(selectedVehicle === 'bomber'){
+    showMessage('BOMBER: HOLD LMB FOR MACHINE GUN • B BOMBS');
+    return;
+  }
+
+  if(gunnerLevel <= 0){
+    showMessage('GUNNER UNLOCKS AFTER 2 RUNS');
+    return;
+  }
+
+  if(gunCooldown > 0) return;
+
+  const cooldown = Math.max(.14, .42 - gunnerLevel*.045);
+  gunCooldown = cooldown;
+
+  // Player's forward direction is local -Z.
+  const dir = new THREE.Vector3(-Math.sin(player.rotation.y),0,-Math.cos(player.rotation.y)).normalize();
+  const muzzle = player.position.clone().add(new THREE.Vector3(0,1.35,0)).addScaledVector(dir,2.5);
+
+  const bullet = new THREE.Mesh(
+    new THREE.SphereGeometry(.11,8,8),
+    new THREE.MeshStandardMaterial({
+      color:0xffe48a,
+      emissive:0xffa300,
+      emissiveIntensity:3
+    })
+  );
+  bullet.position.copy(muzzle);
+  bullet.userData.dir = dir;
+  bullet.userData.life = 1.6;
+  bullet.userData.damage = 28 + Math.max(0,gunnerLevel-1)*8;
+  bullet.castShadow = true;
+
+  scene.add(bullet);
+  bullets.push(bullet);
+}
+
+function disableCop(c, index){
+  // Arcade-style: no gore, the police vehicle is simply disabled and removed.
+  score += 175 + gunnerLevel*25;
+  showMessage(`COP DISABLED! +${175 + gunnerLevel*25}`);
+
+  removeCopHealthBar(c);
+  scene.remove(c);
+  cops.splice(index,1);
+}
+
+
+function fireAircraftMachineGun(){
+  if(!running || extractionComplete) return;
+  if(selectedVehicle !== 'jet' && selectedVehicle !== 'bomber') return;
+  if(aircraftGunCooldown > 0) return;
+
+  aircraftGunCooldown = selectedVehicle === 'jet' ? .075 : .095;
+
+  const dir = new THREE.Vector3(
+    -Math.sin(player.rotation.y),
+    -0.045,
+    -Math.cos(player.rotation.y)
+  ).normalize();
+
+  const forwardFlat = new THREE.Vector3(dir.x,0,dir.z).normalize();
+
+  // Alternate wing/root muzzle sides so the stream looks like twin guns.
+  const shotIndex = Math.floor(performance.now()/70);
+  const side = shotIndex % 2 === 0 ? -1 : 1;
+  const sideOffset = selectedVehicle === 'bomber' ? 2.25 : 1.15;
+
+  const right = new THREE.Vector3(
+    Math.cos(player.rotation.y),
+    0,
+    -Math.sin(player.rotation.y)
+  ).normalize();
+
+  const muzzle = player.position.clone()
+    .add(new THREE.Vector3(0, selectedVehicle === 'bomber' ? .9 : .75, 0))
+    .addScaledVector(forwardFlat, selectedVehicle === 'bomber' ? 5.0 : 4.0)
+    .addScaledVector(right, side*sideOffset);
+
+  const bullet = new THREE.Mesh(
+    new THREE.SphereGeometry(.085,6,6),
+    new THREE.MeshBasicMaterial({
+      color:0xffe7a0,
+      transparent:true,
+      opacity:.96
+    })
+  );
+  bullet.scale.set(1,1,3.2);
+  bullet.position.copy(muzzle);
+  bullet.userData.dir = dir;
+  bullet.userData.life = 1.65;
+  bullet.userData.damage = 20;
+  bullet.userData.aircraftMG = true;
+  bullet.userData.speed = 145;
+
+  scene.add(bullet);
+  bullets.push(bullet);
+}
+
+function updateBullets(dt){
+  gunCooldown = Math.max(0,gunCooldown-dt);
+  aircraftGunCooldown = Math.max(0,aircraftGunCooldown-dt);
+
+  for(let i=bullets.length-1;i>=0;i--){
+    const b = bullets[i];
+    b.userData.life -= dt;
+    b.position.addScaledVector(
+      b.userData.dir,
+      (b.userData.aircraftMG ? (b.userData.speed || 145) : 72) * dt
+    );
+
+    let hit = false;
+
+    if(b.userData.aircraftMG && currentMap === 'range'){
+      // Air targets.
+      for(let j=enemyPlanes.length-1;j>=0;j--){
+        const plane = enemyPlanes[j];
+        const dx=b.position.x-plane.position.x;
+        const dy=b.position.y-(plane.position.y+.6);
+        const dz=b.position.z-plane.position.z;
+
+        if(dx*dx+dy*dy+dz*dz < 4.0*4.0){
+          explodeAt(plane.position.clone().add(new THREE.Vector3(0,.7,0)));
+          scene.remove(plane);
+          plane.traverse(o=>{
+            if(o.geometry) o.geometry.dispose();
+            if(o.material) o.material.dispose();
+          });
+          enemyPlanes.splice(j,1);
+          score += 400;
+          showMessage('MACHINE GUN PLANE HIT! +400');
+          hit = true;
+          break;
+        }
+      }
+
+      // Ground robot targets.
+      if(!hit){
+        for(let j=trainingTargets.length-1;j>=0;j--){
+          const target=trainingTargets[j];
+          const dx=b.position.x-target.position.x;
+          const dy=b.position.y-(target.position.y+1.6);
+          const dz=b.position.z-target.position.z;
+
+          if(dx*dx+dy*dy+dz*dz < 2.4*2.4){
+            explodeAt(target.position.clone().add(new THREE.Vector3(0,1.2,0)));
+            scene.remove(target);
+            target.traverse(o=>{
+              if(o.geometry) o.geometry.dispose();
+              if(o.material) o.material.dispose();
+            });
+            trainingTargets.splice(j,1);
+            score += 120;
+            showMessage('MACHINE GUN TARGET HIT! +120');
+            hit = true;
+            break;
+          }
+        }
+      }
+
+      // Enemy base: 10 HP per machine-gun round.
+      if(!hit && enemyBase){
+        const local = enemyBase.worldToLocal(b.position.clone());
+        if(Math.abs(local.x)<11 && local.y>-1 && local.y<11 && Math.abs(local.z)<9){
+          damageEnemyBase(10,'MACHINE GUN');
+          hit = true;
+        }
+      }
+    }
+
+    for(let j=cops.length-1;!hit && j>=0;j--){
+      const c = cops[j];
+      const dx=b.position.x-c.position.x;
+      const dz=b.position.z-c.position.z;
+      if(dx*dx+dz*dz < 3.1*3.1){
+        c.userData.gunHP = Math.max(
+          0,
+          (c.userData.gunHP ?? c.userData.maxGunHP ?? 100) -
+          (b.userData.aircraftMG ? 20 : b.userData.damage)
+        );
+        updateCopHealthBar(c);
+        hit = true;
+
+        if(c.userData.gunHP <= 0){
+          if(b.userData.aircraftMG){
+            score += 225;
+            showMessage('MACHINE GUN COP DISABLED! +225');
+            removeCopHealthBar(c);
+            scene.remove(c);
+            cops.splice(j,1);
+          } else {
+            disableCop(c,j);
+          }
+        } else {
+          score += b.userData.aircraftMG ? 8 : 15;
+          cameraPunch = Math.max(cameraPunch,.08);
+          showMessage(`HIT! ${Math.ceil(c.userData.gunHP)} HP`);
+        }
+        break;
+      }
+    }
+
+    if(hit || b.userData.life <= 0){
+      scene.remove(b);
+      b.geometry.dispose();
+      b.material.dispose();
+      bullets.splice(i,1);
+    }
+  }
+}
+
+
+function updateBombReticle(t){
+  if(!bombReticle) return;
+
+  const show = running &&
+    (selectedVehicle === 'helicopter' || selectedVehicle === 'bomber') &&
+    !extractionComplete &&
+    !!player;
+  bombReticle.visible = show;
+
+  if(!show) return;
+
+  // Bombs currently fall straight down, so the landing point is directly below the helicopter.
+  bombReticle.position.set(player.position.x, 0.12, player.position.z);
+
+  const pulse = 1 + Math.sin(t*5.5) * 0.08;
+  bombReticle.scale.setScalar(pulse);
+}
+
+
+function updateJetTargetReticle(t){
+  if(!jetTargetReticle || !player) return;
+
+  const show = running && selectedVehicle === 'jet' && !extractionComplete;
+  jetTargetReticle.visible = show;
+  if(!show) return;
+
+  const dir = new THREE.Vector3(
+    -Math.sin(player.rotation.y),
+    0,
+    -Math.cos(player.rotation.y)
+  ).normalize();
+
+  // Big circle sits ahead of the jet on the ground.
+  const distanceAhead = 55 + Math.max(0,player.position.y-10)*2.2;
+  jetTargetReticle.position.copy(player.position).addScaledVector(dir,distanceAhead);
+  jetTargetReticle.position.y = .13;
+
+  const pulse = 1 + Math.sin(t*6)*.07;
+  jetTargetReticle.scale.setScalar(pulse);
+}
+
+function fireJetMissile(){
+  if(!running || extractionComplete || selectedVehicle !== 'jet') return;
+  if(missileCooldown > 0) return;
+
+  missileCooldown = .42;
+
+  const dir = new THREE.Vector3(
+    -Math.sin(player.rotation.y),
+    0,
+    -Math.cos(player.rotation.y)
+  ).normalize();
+
+  const missile = new THREE.Mesh(
+    new THREE.CylinderGeometry(.12,.16,1.5,10),
+    new THREE.MeshStandardMaterial({
+      color:0xd8dde2,
+      metalness:.7,
+      roughness:.25,
+      emissive:0x4a1b00,
+      emissiveIntensity:.25
+    })
+  );
+
+  missile.rotation.x = Math.PI/2;
+  missile.rotation.y = player.rotation.y;
+  missile.position.copy(player.position).add(new THREE.Vector3(0,-.4,0)).addScaledVector(dir,2.8);
+
+  missile.userData.dir = dir;
+  missile.userData.life = 2.4;
+  missile.userData.speed = 95;
+
+  scene.add(missile);
+  missiles.push(missile);
+}
+
+function updateMissiles(dt){
+  missileCooldown = Math.max(0,missileCooldown-dt);
+
+  for(let i=missiles.length-1;i>=0;i--){
+    const m = missiles[i];
+    m.userData.life -= dt;
+
+    // Missile travels forward and gradually descends toward the target circle.
+    m.position.addScaledVector(m.userData.dir,m.userData.speed*dt);
+    m.position.y -= 10.5*dt;
+
+    let exploded = false;
+
+    if(currentMap === 'range'){
+      const directHits = hitTrainingTargetsAt(m.position,4.5,true);
+      const directPlaneHits = hitEnemyPlanesAt(m.position,6.5,true);
+      if(hitEnemyBaseAt(m.position,10,50,'MISSILE HIT')) exploded = true;
+      if(directHits>0 || directPlaneHits>0) exploded=true;
+    }
+
+    for(let j=cops.length-1;!exploded && j>=0;j--){
+      const c = cops[j];
+      const dx=m.position.x-c.position.x;
+      const dz=m.position.z-c.position.z;
+      const dy=m.position.y-(c.position.y+1);
+
+      if(dx*dx+dz*dz+dy*dy < 4.2*4.2){
+        explodeAt(c.position.clone().add(new THREE.Vector3(0,1,0)));
+        removeCopHealthBar(c);
+        scene.remove(c);
+        cops.splice(j,1);
+        score += 350;
+        showMessage('MISSILE HIT! +350');
+        exploded = true;
+        break;
+      }
+    }
+
+    if(!exploded && m.position.y <= .35){
+      const blastPos=m.position.clone();
+      blastPos.y=.55;
+      explodeAt(blastPos);
+
+      let destroyed=0;
+
+      if(currentMap === 'range'){
+        hitTrainingTargetsAt(blastPos,10,false);
+        hitEnemyPlanesAt(blastPos,14,false);
+        hitEnemyBaseAt(blastPos,14,50,'MISSILE BLAST');
+      }
+
+      for(let j=cops.length-1;j>=0;j--){
+        const c=cops[j];
+        const dx=c.position.x-blastPos.x;
+        const dz=c.position.z-blastPos.z;
+        if(Math.hypot(dx,dz)<9){
+          explodeAt(c.position.clone().add(new THREE.Vector3(0,1,0)));
+          removeCopHealthBar(c);
+          scene.remove(c);
+          cops.splice(j,1);
+          destroyed++;
+          score += 300;
+        }
+      }
+
+      if(destroyed>0){
+        showMessage(`MISSILE BLAST! ${destroyed} COP${destroyed===1?'':'S'} +${destroyed*300}`);
+      }
+
+      exploded=true;
+    }
+
+    if(exploded || m.userData.life<=0){
+      scene.remove(m);
+      m.geometry.dispose();
+      m.material.dispose();
+      missiles.splice(i,1);
+    }
+  }
+}
+
+function dropBomb(){
+  if(!running || extractionComplete) return;
+
+  if(selectedVehicle !== 'helicopter' && selectedVehicle !== 'bomber'){
+    showMessage(selectedVehicle === 'jet' ? 'JET HAS MISSILES — PRESS E' : 'BOMBS NEED AN AIRCRAFT');
+    return;
+  }
+
+  if(bombCooldown > 0) return;
+
+  if(selectedVehicle === 'bomber'){
+    if(bomberReloadTimer > 0){
+      showMessage(`BOMB BAY RELOADING ${bomberReloadTimer.toFixed(1)}s`);
+      return;
+    }
+
+    if(bomberBombAmmo <= 0){
+      bomberReloadTimer = 9;
+      showMessage('BOMB BAY EMPTY — RELOADING 9s');
+      return;
+    }
+
+    bomberBombAmmo--;
+    bombCooldown = .32;
+  } else {
+    bombCooldown = Math.max(.55, 1.25 - Math.floor(runsBeaten/3)*.08);
+  }
+
+  const bomb = new THREE.Mesh(
+    new THREE.SphereGeometry(selectedVehicle === 'bomber' ? .36 : .28,10,10),
+    new THREE.MeshStandardMaterial({color:0x20252a,metalness:.7,roughness:.3})
+  );
+  bomb.scale.set(1,1.45,1);
+  bomb.position.copy(player.position);
+  bomb.position.y -= selectedVehicle === 'bomber' ? 1.8 : 1.3;
+  bomb.userData.vy = selectedVehicle === 'bomber' ? -4.2 : -3.5;
+  bomb.userData.life = 4.2;
+  bomb.userData.heavy = selectedVehicle === 'bomber';
+  scene.add(bomb);
+  bombs.push(bomb);
+
+  if(selectedVehicle === 'bomber' && bomberBombAmmo === 0){
+    bomberReloadTimer = 9;
+    showMessage('LAST BOMB! RELOADING 9s');
+  }
+}
+
+function explodeAt(pos){
+  const blast = new THREE.Group();
+
+  // Bright central fireball.
+  for(let i=0;i<9;i++){
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry(.65 + Math.random()*.8,12,10),
+      new THREE.MeshStandardMaterial({
+        color: i%3===0 ? 0xffe66b : (i%2 ? 0xff7b19 : 0xffb327),
+        emissive: i%2 ? 0xff3b00 : 0xff8a00,
+        emissiveIntensity: 4.0,
+        transparent:true,
+        opacity:.94,
+        roughness:.35,
+        depthWrite:false
+      })
+    );
+    puff.position.set(
+      (Math.random()-.5)*3.0,
+      Math.random()*2.5,
+      (Math.random()-.5)*3.0
+    );
+    puff.userData.fire=true;
+    blast.add(puff);
+  }
+
+  // Dark smoke shell.
+  for(let i=0;i<7;i++){
+    const smoke = new THREE.Mesh(
+      new THREE.SphereGeometry(1.0+Math.random()*.9,9,8),
+      new THREE.MeshStandardMaterial({
+        color:0x3d3a36,
+        transparent:true,
+        opacity:.55,
+        roughness:1,
+        depthWrite:false
+      })
+    );
+    smoke.position.set(
+      (Math.random()-.5)*3.5,
+      1.6+Math.random()*2.8,
+      (Math.random()-.5)*3.5
+    );
+    smoke.userData.smoke=true;
+    blast.add(smoke);
+  }
+
+  // Expanding shockwave ring.
+  const shock = new THREE.Mesh(
+    new THREE.RingGeometry(1.5,2.2,36),
+    new THREE.MeshBasicMaterial({
+      color:0xffc86a,
+      transparent:true,
+      opacity:.7,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  shock.rotation.x=-Math.PI/2;
+  shock.position.y=.18;
+  shock.userData.shock=true;
+  blast.add(shock);
+
+  // Brief local light.
+  const flash = new THREE.PointLight(0xff8b2f,8,35,2);
+  flash.position.y=2.2;
+  flash.userData.flash=true;
+  blast.add(flash);
+
+  blast.position.copy(pos);
+  scene.add(blast);
+  explosions.push({group:blast,life:.95,maxLife:.95});
+  cameraPunch = Math.max(cameraPunch,.62);
+}
+
+function updateBombs(dt){
+  bombCooldown = Math.max(0,bombCooldown-dt);
+
+  if(bomberReloadTimer > 0){
+    bomberReloadTimer = Math.max(0,bomberReloadTimer-dt);
+    if(bomberReloadTimer === 0){
+      bomberBombAmmo = BOMBER_MAX_BOMBS;
+      if(selectedVehicle === 'bomber') showMessage('BOMB BAY RELOADED!');
+    }
+  }
+
+  for(let i=bombs.length-1;i>=0;i--){
+    const b = bombs[i];
+    b.userData.life -= dt;
+    b.userData.vy -= 18*dt;
+    b.position.y += b.userData.vy*dt;
+
+    if(b.position.y <= .28 || b.userData.life <= 0){
+      const blastPos = b.position.clone();
+      blastPos.y = .55;
+      explodeAt(blastPos);
+
+      let destroyed = 0;
+      const blastRadius = b.userData.heavy ? 15 : 12;
+
+      if(currentMap === 'range'){
+        hitTrainingTargetsAt(blastPos, b.userData.heavy ? 15 : 12, false);
+        hitEnemyPlanesAt(blastPos, b.userData.heavy ? 18 : 14, false);
+        hitEnemyBaseAt(
+          blastPos,
+          b.userData.heavy ? 20 : 16,
+          b.userData.heavy ? 250 : 150,
+          b.userData.heavy ? 'HEAVY BOMB HIT' : 'BOMB HIT'
+        );
+      }
+
+      for(let j=cops.length-1;j>=0;j--){
+        const c = cops[j];
+        const dx=c.position.x-blastPos.x;
+        const dz=c.position.z-blastPos.z;
+        const dist=Math.hypot(dx,dz);
+
+        if(dist < blastRadius){
+          explodeAt(c.position.clone().add(new THREE.Vector3(0,1,0)));
+          removeCopHealthBar(c);
+          scene.remove(c);
+          cops.splice(j,1);
+          destroyed++;
+          score += 300;
+        }
+      }
+
+      if(destroyed > 0){
+        showMessage(`BOOM! ${destroyed} COP${destroyed===1?'':'S'} BLOWN UP +${destroyed*300}`);
+      } else {
+        showMessage('BOOM!');
+      }
+
+      scene.remove(b);
+      b.geometry.dispose();
+      b.material.dispose();
+      bombs.splice(i,1);
+    }
+  }
+
+  for(let i=explosions.length-1;i>=0;i--){
+    const ex=explosions[i];
+    ex.life -= dt;
+    const progress = 1 - ex.life/ex.maxLife;
+    const fade = Math.max(0,ex.life/ex.maxLife);
+
+    ex.group.children.forEach(p=>{
+      if(p.userData.fire){
+        const s=1+progress*3.2;
+        p.scale.setScalar(s);
+        p.position.y += dt*1.5;
+        if(p.material) p.material.opacity=fade;
+      } else if(p.userData.smoke){
+        const s=1+progress*2.4;
+        p.scale.setScalar(s);
+        p.position.y += dt*4.0;
+        if(p.material) p.material.opacity=fade*.55;
+      } else if(p.userData.shock){
+        const s=1+progress*7.5;
+        p.scale.setScalar(s);
+        if(p.material) p.material.opacity=fade*.65;
+      } else if(p.userData.flash){
+        p.intensity = 8*fade;
+      }
+    });
+
+    if(ex.life <= 0){
+      scene.remove(ex.group);
+      ex.group.traverse(o=>{
+        if(o.geometry) o.geometry.dispose();
+        if(o.material) o.material.dispose();
+      });
+      explosions.splice(i,1);
+    }
+  }
+}
+
+
+function attachCopHealthBar(c){
+  const bar = new THREE.Group();
+
+  const bg = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.2,.55),
+    new THREE.MeshBasicMaterial({
+      color:0x111111,
+      transparent:true,
+      opacity:.85,
+      depthTest:true,
+      depthWrite:false
+    })
+  );
+
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.8,.30),
+    new THREE.MeshBasicMaterial({
+      color:0x37e66b,
+      depthTest:true,
+      depthWrite:false
+    })
+  );
+
+  bg.renderOrder = 20;
+  fill.renderOrder = 21;
+  fill.position.z = .01;
+
+  bar.add(bg);
+  bar.add(fill);
+  scene.add(bar);
+
+  c.userData.healthBar = bar;
+  c.userData.healthFill = fill;
+  updateCopHealthBar(c);
+}
+
+function updateCopHealthBar(c){
+  const bar = c.userData.healthBar;
+  const fill = c.userData.healthFill;
+  if(!bar || !fill) return;
+
+  const maxHP = Math.max(1,c.userData.maxGunHP || 100);
+  const ratio = THREE.MathUtils.clamp(c.userData.gunHP / maxHP,0,1);
+
+  // Keep the health bar facing the camera and hovering above the vehicle.
+  bar.position.copy(c.position);
+  bar.position.y += 3.7 * Math.max(1,c.scale.y);
+  bar.quaternion.copy(camera.quaternion);
+
+  // Shrink from left to right.
+  fill.scale.x = ratio;
+  fill.position.x = -1.9 * (1-ratio);
+
+  if(ratio > .55) fill.material.color.setHex(0x37e66b);
+  else if(ratio > .25) fill.material.color.setHex(0xffd43b);
+  else fill.material.color.setHex(0xff3b3b);
+}
+
+function removeCopHealthBar(c){
+  const bar = c?.userData?.healthBar;
+  if(!bar) return;
+
+  scene.remove(bar);
+  bar.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    if(o.material) o.material.dispose();
+  });
+
+  c.userData.healthBar = null;
+  c.userData.healthFill = null;
+}
+
+function makePoliceVehicle(typeId='sedan'){
+  const type = policeFleet.find(v=>v.id===typeId) || policeFleet[0];
+  const c = makeCar(0x101820,true);
+
+  c.userData.policeType = type.id;
+  c.userData.policeName = type.name;
+  c.userData.speedMult = type.speed;
+  c.userData.damageMult = type.damage;
+  c.userData.maxGunHP =
+    type.id === 'heavy' ? 220 :
+    type.id === 'armored' ? 180 :
+    type.id === 'elite' ? 190 :
+    type.id === 'suv' ? 135 :
+    type.id === 'muscle' ? 125 :
+    type.id === 'interceptor' ? 90 : 100;
+
+  c.userData.gunHP = c.userData.maxGunHP;
+
+  if(type.id === 'suv'){
+    c.scale.set(1.12,1.22,1.08);
+    const roof = box(1.7,.42,1.5,0x16202a,.2,.55);
+    roof.position.set(0,1.55,.4);
+    c.add(roof);
+  }
+
+  if(type.id === 'interceptor'){
+    c.scale.set(1.12,.86,1.12);
+    const spoiler = box(1.8,.12,.32,0x111820,.25,.4);
+    spoiler.position.set(0,1.35,1.78);
+    c.add(spoiler);
+  }
+
+  if(type.id === 'armored'){
+    c.scale.set(1.22,1.32,1.22);
+    const armor = box(2.0,.85,2.3,0x39434c,.5,.65);
+    armor.position.set(0,1.35,.4);
+    c.add(armor);
+    const bumper = box(2.5,.35,.45,0x1b2025,.65,.55);
+    bumper.position.set(0,.55,-2.35);
+    c.add(bumper);
+  }
+
+  if(type.id === 'muscle'){
+    c.scale.set(1.16,.96,1.08);
+    const hood = box(1.1,.2,.9,0x2b333a,.35,.45);
+    hood.position.set(0,1.08,-1.05);
+    c.add(hood);
+    const rear = box(1.9,.13,.3,0x111820,.3,.4);
+    rear.position.set(0,1.45,1.7);
+    c.add(rear);
+  }
+
+  if(type.id === 'heavy'){
+    c.scale.set(1.32,1.42,1.32);
+    const rearBox = box(2.15,1.45,2.3,0x303940,.35,.7);
+    rearBox.position.set(0,1.55,.75);
+    c.add(rearBox);
+    const ram = box(2.8,.48,.5,0x171c21,.65,.5);
+    ram.position.set(0,.62,-2.45);
+    c.add(ram);
+  }
+
+  if(type.id === 'elite'){
+    c.scale.set(1.18,.90,1.18);
+    const splitter = box(2.3,.16,.55,0x11161b,.55,.35);
+    splitter.position.set(0,.38,-2.32);
+    c.add(splitter);
+    const wing = box(2.1,.13,.35,0x11161b,.55,.35);
+    wing.position.set(0,1.48,1.85);
+    c.add(wing);
+    // Extra roof light for the elite unit.
+    const beacon = box(.35,.2,.35,0xffd43b);
+    beacon.position.set(0,1.9,.1);
+    beacon.material.emissive = new THREE.Color(0xff9f00);
+    beacon.material.emissiveIntensity = 3;
+    c.add(beacon);
+  }
+
+  attachCopHealthBar(c);
+  return c;
+}
+
+function getUnlockedPoliceTypes(){
+  // Start with sedan. Each completed run unlocks one more type.
+  // Elite stays as the final special unit; later wins make the whole fleet stronger.
+  const count = Math.min(policeFleet.length, 1 + runsBeaten);
+  return policeFleet.slice(0,count);
+}
+
+function makeRoadStrip(vertical=true){
+  const g = new THREE.Group();
+  const roadMat = new THREE.MeshStandardMaterial({color:0x30343a, roughness:.95});
+  const sideMat = new THREE.MeshStandardMaterial({color:0x92979c, roughness:1});
+  const lineMat = new THREE.MeshBasicMaterial({color:0xfff3a0});
+
+  const road = new THREE.Mesh(
+    vertical ? new THREE.PlaneGeometry(55,1200) : new THREE.PlaneGeometry(1200,55),
+    roadMat
+  );
+  road.rotation.x = -Math.PI/2;
+  road.position.y = .015;
+  road.receiveShadow = true;
+  g.add(road);
+
+  for(const side of [-31,31]){
+    const walk = new THREE.Mesh(
+      vertical ? new THREE.PlaneGeometry(7,1200) : new THREE.PlaneGeometry(1200,7),
+      sideMat
+    );
+    walk.rotation.x = -Math.PI/2;
+    walk.position.y = .025;
+    if(vertical) walk.position.x = side;
+    else walk.position.z = side;
+    g.add(walk);
+  }
+
+  // Long center lane marks.
+  for(const offset of [-.7,.7]){
+    const line = new THREE.Mesh(
+      vertical ? new THREE.PlaneGeometry(.16,1200) : new THREE.PlaneGeometry(1200,.16),
+      lineMat
+    );
+    line.rotation.x = -Math.PI/2;
+    line.position.y = .036;
+    if(vertical) line.position.x = offset;
+    else line.position.z = offset;
+    g.add(line);
+  }
+
+  scene.add(g);
+  return g;
+}
+
+
+
+function clearRangeDecor(){
+  for(const d of rangeDecor){
+    scene.remove(d);
+    d.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material) o.material.dispose();
+    });
+  }
+  rangeDecor = [];
+}
+
+function makeRangeCrater(x,z,scale=1){
+  const g = new THREE.Group();
+
+  const rim = new THREE.Mesh(
+    new THREE.CylinderGeometry(6.8*scale, 8.8*scale, 1.2*scale, 18),
+    new THREE.MeshStandardMaterial({color:0x6b5738, roughness:1})
+  );
+  rim.position.y = .35*scale;
+  g.add(rim);
+
+  const hole = new THREE.Mesh(
+    new THREE.CylinderGeometry(5.9*scale, 4.2*scale, 1.6*scale, 18),
+    new THREE.MeshStandardMaterial({color:0x443420, roughness:1})
+  );
+  hole.position.y = .02*scale;
+  g.add(hole);
+
+  g.position.set(x,0,z);
+  scene.add(g);
+  rangeDecor.push(g);
+  return g;
+}
+
+function makeTrenchLane(centerX, startZ, length=560){
+  const g = new THREE.Group();
+
+  const mudMat = new THREE.MeshStandardMaterial({color:0x46351f, roughness:1});
+  const wallMat = new THREE.MeshStandardMaterial({color:0x675032, roughness:.98});
+  const sandbagMat = new THREE.MeshStandardMaterial({color:0x9b845d, roughness:.92});
+  const timberMat = new THREE.MeshStandardMaterial({color:0x5a432b, roughness:.96});
+
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(12, .8, length), mudMat);
+  floor.position.set(centerX, .18, startZ - length/2);
+  floor.receiveShadow = true;
+  g.add(floor);
+
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.3, length), wallMat);
+  leftWall.position.set(centerX - 8.2, 1.15, startZ - length/2);
+  leftWall.castShadow = true;
+  g.add(leftWall);
+
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.3, length), wallMat);
+  rightWall.position.set(centerX + 8.2, 1.15, startZ - length/2);
+  rightWall.castShadow = true;
+  g.add(rightWall);
+
+  // Timber duckboards inside the trench.
+  for(let z = startZ - 7; z > startZ - length + 7; z -= 8){
+    const plank = new THREE.Mesh(
+      new THREE.BoxGeometry(10.2,.16,1.05),
+      timberMat
+    );
+    plank.position.set(centerX,.68,z);
+    plank.rotation.y=(Math.random()-.5)*.08;
+    plank.receiveShadow=true;
+    g.add(plank);
+  }
+
+  // Sandbag rows along the top.
+  for(let z = startZ - 8; z > startZ - length + 8; z -= 18){
+    for(const side of [-1,1]){
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(3.0,.95,1.2), sandbagMat);
+      bag.position.set(centerX + side*8.2, 2.15, z);
+      bag.rotation.y = (Math.random()-.5)*.25;
+      bag.castShadow = true;
+      g.add(bag);
+    }
+  }
+
+  scene.add(g);
+  rangeDecor.push(g);
+  return g;
+}
+
+function buildTrenchRangeDecor(){
+  clearRangeDecor();
+
+  // Main trench lines.
+  makeTrenchLane(-110, 300, 610);
+  makeTrenchLane(0, 320, 650);
+  makeTrenchLane(110, 300, 610);
+
+  // Cross trenches / connectors.
+  const wallMat = new THREE.MeshStandardMaterial({color:0x6f5a36, roughness:1});
+  const mudMat = new THREE.MeshStandardMaterial({color:0x4c3b24, roughness:1});
+
+  const connectors = [
+    {x:-55,z:170,w:115},
+    {x:55,z:40,w:115},
+    {x:-55,z:-90,w:115},
+    {x:55,z:-210,w:115}
+  ];
+
+  for(const c of connectors){
+    const g = new THREE.Group();
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(c.w,.8,12), mudMat);
+    floor.position.set(c.x,.18,c.z);
+    g.add(floor);
+
+    const topWall = new THREE.Mesh(new THREE.BoxGeometry(c.w,2.1,4.4), wallMat);
+    topWall.position.set(c.x,1.05,c.z-8.2);
+    g.add(topWall);
+
+    const bottomWall = new THREE.Mesh(new THREE.BoxGeometry(c.w,2.1,4.4), wallMat);
+    bottomWall.position.set(c.x,1.05,c.z+8.2);
+    g.add(bottomWall);
+
+    scene.add(g);
+    rangeDecor.push(g);
+  }
+
+  // Scattered craters.
+  const craterPoints = [
+    [-175,210,1.0], [-60,245,.8], [70,245,.9], [180,200,1.05],
+    [-185,80,.9], [-45,110,1.1], [55,80,.85], [180,90,1.0],
+    [-160,-35,.95], [-20,-20,.75], [90,-15,1.05], [180,-55,.9],
+    [-170,-180,1.05], [-65,-220,.8], [55,-180,.9], [170,-205,1.1]
+  ];
+
+  for(const [x,z,s] of craterPoints){
+    makeRangeCrater(x,z,s);
+  }
+
+  // Wooden anti-vehicle stakes and broken fence lines in no-man's-land.
+  const stakeMat = new THREE.MeshStandardMaterial({color:0x4b3d2c,roughness:1});
+  const wireMat = new THREE.MeshStandardMaterial({color:0x4f5558,metalness:.65,roughness:.5});
+
+  for(const z of [255,145,15,-110,-235]){
+    for(let x=-205;x<=205;x+=34){
+      if(Math.abs(x)<18 || Math.abs(Math.abs(x)-110)<18) continue;
+
+      const stake = new THREE.Group();
+      for(const rot of [-.75,.75]){
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(.42,4.6,.42),stakeMat);
+        beam.rotation.z=rot;
+        beam.position.y=1.55;
+        stake.add(beam);
+      }
+      stake.position.set(x,0,z+(Math.random()-.5)*8);
+      scene.add(stake);
+      rangeDecor.push(stake);
+    }
+  }
+
+  // Sparse wire posts.
+  for(const z of [188,-42,-165]){
+    const g=new THREE.Group();
+    for(let x=-210;x<=210;x+=24){
+      const post=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,2.4,6),wireMat);
+      post.position.set(x,1.15,z);
+      g.add(post);
+    }
+    scene.add(g);
+    rangeDecor.push(g);
+  }
+
+  // Atmospheric smoke columns.
+  makeBattlefieldSmoke(-185,245,1.0);
+  makeBattlefieldSmoke(170,105,.85);
+  makeBattlefieldSmoke(-145,-55,.95);
+  makeBattlefieldSmoke(150,-205,1.05);
+}
+
+function makeTrainingRobotTarget(x,z,index,moveAxis='x',moveSpan=16,moveSpeed=1.0,phase=0){
+  const g = new THREE.Group();
+
+  const metal = new THREE.MeshStandardMaterial({
+    color:0x596873,
+    metalness:.55,
+    roughness:.42
+  });
+  const dark = new THREE.MeshStandardMaterial({
+    color:0x202a31,
+    metalness:.6,
+    roughness:.35
+  });
+  const glow = new THREE.MeshStandardMaterial({
+    color:0xffb436,
+    emissive:0xff7a00,
+    emissiveIntensity:2.1,
+    roughness:.28
+  });
+
+  // Clearly robotic/non-human training target.
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.7,.85),metal);
+  body.position.y=1.75;
+  body.castShadow=true;
+  g.add(body);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.9,.65,.7),dark);
+  head.position.y=2.95;
+  g.add(head);
+
+  const eye = new THREE.Mesh(new THREE.BoxGeometry(.55,.12,.08),glow);
+  eye.position.set(0,3.0,-.38);
+  g.add(eye);
+
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(.34,1.1,.38),dark);
+  legL.position.set(-.34,.6,0);
+  g.add(legL);
+  const legR = legL.clone();
+  legR.position.x=.34;
+  g.add(legR);
+
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(.28,1.25,.32),metal);
+  armL.position.set(-.86,1.8,0);
+  g.add(armL);
+  const armR = armL.clone();
+  armR.position.x=.86;
+  g.add(armR);
+
+  // Bright training-target plate.
+  const plate = new THREE.Mesh(
+    new THREE.CylinderGeometry(.48,.48,.12,20),
+    new THREE.MeshStandardMaterial({
+      color:0xffe05b,
+      emissive:0xffa000,
+      emissiveIntensity:1.7
+    })
+  );
+  plate.rotation.x=Math.PI/2;
+  plate.position.set(0,1.75,-.52);
+  g.add(plate);
+
+  // Ground target circle around each robot.
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(2.2,2.65,28),
+    new THREE.MeshBasicMaterial({
+      color:0xffc641,
+      transparent:true,
+      opacity:.72,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  ring.rotation.x=-Math.PI/2;
+  ring.position.y=.04;
+  g.add(ring);
+
+  g.position.set(x,0,z);
+  g.userData.isTrainingTarget=true;
+  g.userData.targetIndex=index;
+  g.userData.homeX = x;
+  g.userData.homeZ = z;
+  g.userData.moveAxis = moveAxis;
+  g.userData.moveSpan = moveSpan;
+  g.userData.moveSpeed = moveSpeed;
+  g.userData.phase = phase;
+  g.userData.baseY = 0;
+  scene.add(g);
+  return g;
+}
+
+
+function clearEnemyPlanes(){
+  for(const plane of enemyPlanes){
+    scene.remove(plane);
+    plane.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material) o.material.dispose();
+    });
+  }
+  enemyPlanes = [];
+}
+
+function makeEnemyPlane(x,y,z,index,axis='x',span=110,speed=1.0,phase=0){
+  const g = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color:0x7c4a40,
+    metalness:.42,
+    roughness:.44
+  });
+  const wingMat = new THREE.MeshStandardMaterial({
+    color:0x6c4037,
+    metalness:.38,
+    roughness:.48
+  });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color:0x88b6cf,
+    transparent:true,
+    opacity:.62,
+    roughness:.12
+  });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8,1.0,7.6), bodyMat);
+  body.position.y = .55;
+  body.castShadow = true;
+  g.add(body);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(.85,2.1,12), bodyMat);
+  nose.rotation.x = -Math.PI/2;
+  nose.position.set(0,.55,-4.75);
+  g.add(nose);
+
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.0,.55,1.4), glassMat);
+  cockpit.position.set(0,1.0,-1.7);
+  g.add(cockpit);
+
+  const wings = new THREE.Mesh(new THREE.BoxGeometry(8.0,.24,2.3), wingMat);
+  wings.position.set(0,.55,-.1);
+  wings.castShadow = true;
+  g.add(wings);
+
+  const tailWing = new THREE.Mesh(new THREE.BoxGeometry(3.2,.18,1.2), wingMat);
+  tailWing.position.set(0,1.15,2.9);
+  g.add(tailWing);
+
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(.18,1.4,1.2), wingMat);
+  fin.position.set(0,1.7,3.1);
+  g.add(fin);
+
+  // Unarmed plane: just engine pods / propellers, no guns.
+  for(const px of [-1.9,1.9]){
+    const eng = new THREE.Mesh(
+      new THREE.CylinderGeometry(.34,.42,1.7,10),
+      new THREE.MeshStandardMaterial({color:0x353638,metalness:.65,roughness:.35})
+    );
+    eng.rotation.x = Math.PI/2;
+    eng.position.set(px,.42,-.15);
+    g.add(eng);
+
+    const prop = new THREE.Group();
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(1.45,.06,.14), wingMat);
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(.14,.06,1.45), wingMat);
+    prop.add(p1,p2);
+
+    const blur = new THREE.Mesh(
+      new THREE.CircleGeometry(.8,18),
+      new THREE.MeshBasicMaterial({
+        color:0xd4d9dc,
+        transparent:true,
+        opacity:.12,
+        side:THREE.DoubleSide,
+        depthWrite:false
+      })
+    );
+    blur.rotation.y = Math.PI/2;
+    prop.add(blur);
+
+    prop.position.set(px,.42,-1.05);
+    g.add(prop);
+
+    if(!g.userData.props) g.userData.props = [];
+    g.userData.props.push(prop);
+  }
+
+  g.position.set(x,y,z);
+  g.userData.isEnemyPlane = true;
+  g.userData.enemyPlaneIndex = index;
+  g.userData.homeX = x;
+  g.userData.homeY = y;
+  g.userData.homeZ = z;
+  g.userData.moveAxis = axis;
+  g.userData.moveSpan = span;
+  g.userData.moveSpeed = speed;
+  g.userData.phase = phase;
+  g.userData.bobHeight = .9 + Math.random()*.5;
+  g.userData.hp = 1;  // simple flying target
+  scene.add(g);
+  return g;
+}
+
+function updateEnemyPlanes(dt,t){
+  if(currentMap !== 'range') return;
+
+  for(const plane of enemyPlanes){
+    const speed = plane.userData.moveSpeed || 1;
+    const span = plane.userData.moveSpan || 0;
+    const phase = plane.userData.phase || 0;
+    const offset = Math.sin(t*speed + phase) * span;
+
+    if(plane.userData.moveAxis === 'z'){
+      plane.position.z = plane.userData.homeZ + offset;
+      plane.position.x = plane.userData.homeX + Math.sin(t*speed*.7 + phase) * 9;
+      plane.rotation.y = offset >= 0 ? Math.PI : 0;
+    } else {
+      plane.position.x = plane.userData.homeX + offset;
+      plane.position.z = plane.userData.homeZ + Math.sin(t*speed*.75 + phase) * 8;
+      plane.rotation.y = offset >= 0 ? -Math.PI/2 : Math.PI/2;
+    }
+
+    plane.position.y = plane.userData.homeY + Math.sin(t*speed*1.8 + phase) * plane.userData.bobHeight;
+
+    if(plane.userData.props){
+      for(const p of plane.userData.props){
+        p.rotation.z += 26*dt;
+      }
+    }
+  }
+}
+
+function hitEnemyPlanesAt(position, radius, direct=false){
+  if(currentMap !== 'range') return 0;
+
+  let hit = 0;
+  for(let i=enemyPlanes.length-1;i>=0;i--){
+    const plane = enemyPlanes[i];
+    const dx = plane.position.x - position.x;
+    const dy = (plane.position.y + .6) - position.y;
+    const dz = plane.position.z - position.z;
+
+    const dist3 = Math.hypot(dx,dy,dz);
+    const near = direct ? dist3 < Math.max(6,radius) : dist3 < radius;
+
+    if(near){
+      explodeAt(plane.position.clone().add(new THREE.Vector3(0,.7,0)));
+      scene.remove(plane);
+      plane.traverse(o=>{
+        if(o.geometry) o.geometry.dispose();
+        if(o.material) o.material.dispose();
+      });
+      enemyPlanes.splice(i,1);
+      hit++;
+      score += direct ? 900 : 650;
+    }
+  }
+
+  if(hit > 0){
+    showMessage(direct ? `ENEMY PLANE DOWN! +${hit*900}` : `PLANE BLAST HIT! +${hit*650}`);
+
+    if(trainingTargets.length === 0 && enemyPlanes.length === 0){
+      showMessage('AIR RANGE CLEAR!');
+    }
+  }
+
+  return hit;
+}
+
+function clearTrainingRange(){
+  clearEnemyBase();
+  clearEnemyPlanes();
+  clearRangeDecor();
+
+  for(const t of trainingTargets){
+    scene.remove(t);
+    t.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material) o.material.dispose();
+    });
+  }
+  trainingTargets=[];
+  rangeTargetsDestroyed=0;
+}
+
+
+function updateTrainingTargets(dt,t){
+  if(currentMap !== 'range') return;
+
+  for(const target of trainingTargets){
+    const speed = target.userData.moveSpeed || 1;
+    const span = target.userData.moveSpan || 0;
+    const phase = target.userData.phase || 0;
+    const offset = Math.sin(t*speed + phase) * span;
+
+    if(target.userData.moveAxis === 'z'){
+      target.position.z = target.userData.homeZ + offset;
+      target.position.x = target.userData.homeX;
+      target.rotation.y = offset >= 0 ? Math.PI : 0;
+    } else {
+      target.position.x = target.userData.homeX + offset;
+      target.position.z = target.userData.homeZ;
+      target.rotation.y = offset >= 0 ? -Math.PI/2 : Math.PI/2;
+    }
+
+    target.position.y = target.userData.baseY + Math.sin(t*speed*2 + phase)*0.05;
+  }
+}
+
+
+function clearEnemyBase(){
+  if(!enemyBase) return;
+  scene.remove(enemyBase);
+  enemyBase.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    if(o.material) o.material.dispose();
+  });
+  enemyBase = null;
+}
+
+function makeEnemyBase(){
+  const g = new THREE.Group();
+
+  const wallMat = new THREE.MeshStandardMaterial({
+    color:0x726d62,
+    roughness:.92,
+    metalness:.08
+  });
+  const bunkerMat = new THREE.MeshStandardMaterial({
+    color:0x5e594f,
+    roughness:.95
+  });
+  const metalMat = new THREE.MeshStandardMaterial({
+    color:0x3b4145,
+    metalness:.65,
+    roughness:.38
+  });
+  const glowMat = new THREE.MeshStandardMaterial({
+    color:0xffc74d,
+    emissive:0xff8a00,
+    emissiveIntensity:1.8,
+    roughness:.3
+  });
+
+  // Main bunker
+  const core = new THREE.Mesh(new THREE.BoxGeometry(18,5.5,14), bunkerMat);
+  core.position.y = 2.8;
+  core.castShadow = true;
+  g.add(core);
+
+  // Side towers
+  for(const x of [-8.8,8.8]){
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(4.2,7.0,4.2), wallMat);
+    tower.position.set(x,3.5,-1.5);
+    tower.castShadow = true;
+    g.add(tower);
+
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.2,.55,16), metalMat);
+    cap.position.set(x,7.25,-1.5);
+    g.add(cap);
+  }
+
+  // Front blast door
+  const door = new THREE.Mesh(new THREE.BoxGeometry(5.0,3.1,.5), metalMat);
+  door.position.set(0,1.9,-7.25);
+  g.add(door);
+
+  // Turret barrels
+  for(const x of [-6.8,6.8]){
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(.4,.48,4.2,10), metalMat);
+    turret.rotation.x = Math.PI/2;
+    turret.position.set(x,5.8,-6.7);
+    g.add(turret);
+  }
+
+  // Radar mast
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,5.2,8), metalMat);
+  mast.position.set(0,7.2,2.0);
+  g.add(mast);
+
+  const radar = new THREE.Mesh(new THREE.BoxGeometry(3.0,1.1,.18), glowMat);
+  radar.position.set(0,9.9,2.0);
+  g.add(radar);
+
+  // Perimeter ring to make it stand out as a target
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(10.5,12.2,36),
+    new THREE.MeshBasicMaterial({
+      color:0xff6c47,
+      transparent:true,
+      opacity:.78,
+      side:THREE.DoubleSide,
+      depthWrite:false
+    })
+  );
+  ring.rotation.x = -Math.PI/2;
+  ring.position.y = .08;
+  g.add(ring);
+
+  g.position.set(0,0,-308);
+  g.userData.isEnemyBase = true;
+  g.userData.maxHP = ENEMY_BASE_MAX_HP;
+  g.userData.hp = ENEMY_BASE_MAX_HP;
+  scene.add(g);
+  return g;
+}
+
+function spawnEnemyBase(){
+  clearEnemyBase();
+  enemyBase = makeEnemyBase();
+  enemyBaseRespawnTimer = 0;
+}
+
+function destroyEnemyBase(){
+  if(!enemyBase) return false;
+
+  explodeAt(enemyBase.position.clone().add(new THREE.Vector3(0,2.5,0)));
+  explodeAt(enemyBase.position.clone().add(new THREE.Vector3(-4,2,2)));
+  explodeAt(enemyBase.position.clone().add(new THREE.Vector3(4,2,-2)));
+  clearEnemyBase();
+
+  enemyBaseDestroyedCount++;
+  enemyBaseRespawnTimer = 3;
+  score += 1800;
+  showMessage('ENEMY BASE DESTROYED! +1800');
+  return true;
+}
+
+function damageEnemyBase(damage, label='BASE HIT'){
+  if(!enemyBase) return false;
+
+  enemyBase.userData.hp = Math.max(
+    0,
+    (enemyBase.userData.hp ?? ENEMY_BASE_MAX_HP) - damage
+  );
+
+  if(enemyBase.userData.hp <= 0){
+    return destroyEnemyBase();
+  }
+
+  cameraPunch = Math.max(cameraPunch,.18);
+  showMessage(`${label}! BASE ${enemyBase.userData.hp}/${ENEMY_BASE_MAX_HP} HP`);
+  return true;
+}
+
+function hitEnemyBaseAt(position, radius, damage, label='BASE HIT'){
+  if(currentMap !== 'range' || !enemyBase) return false;
+
+  const dx = enemyBase.position.x - position.x;
+  const dz = enemyBase.position.z - position.z;
+  const dist = Math.hypot(dx,dz);
+
+  if(dist <= radius){
+    return damageEnemyBase(damage,label);
+  }
+
+  return false;
+}
+
+function updateEnemyBase(dt){
+  if(currentMap !== 'range') return;
+  if(!enemyBase){
+    enemyBaseRespawnTimer = Math.max(0, enemyBaseRespawnTimer - dt);
+    if(enemyBaseRespawnTimer === 0){
+      spawnEnemyBase();
+      showMessage('ENEMY BASE RESPAWNED');
+    }
+    return;
+  }
+
+  // Small life to the base.
+  enemyBase.children.forEach((part,idx)=>{
+    if(part.material && part.material.emissiveIntensity !== undefined){
+      part.material.emissiveIntensity = Math.max(0, 1.1 + Math.sin(performance.now()/350 + idx)*.45);
+    }
+  });
+}
+
+function setupTrainingRange(){
+  clearTrainingRange();
+
+  currentMap='range';
+  if(selectedVehicle !== 'jet' && selectedVehicle !== 'bomber') selectedVehicle='bomber';
+  rebuildPlayerVehicle();
+
+  // Distinct trench-range look.
+  scene.background.setHex(0xa9a18f);
+  scene.fog.color.setHex(0xa39b86);
+  scene.fog.near = 105;
+  scene.fog.far = 360;
+  if(ground?.material) ground.material.color.setHex(0x665a3c);
+  setSkyPalette('range');
+
+  for(const r of roadStrips) r.mesh.visible=false;
+  buildTrenchRangeDecor();
+
+  // Clear chase units.
+  for(const c of cops){
+    removeCopHealthBar(c);
+    scene.remove(c);
+  }
+  cops=[];
+
+  // Clear extraction objects if they exist.
+  if(objectiveStar){ scene.remove(objectiveStar); objectiveStar=null; }
+  if(massiveCheckpoint){ scene.remove(massiveCheckpoint); massiveCheckpoint=null; }
+  if(runwayGroup){ scene.remove(runwayGroup); runwayGroup=null; }
+  if(cargoPlane){ scene.remove(cargoPlane); cargoPlane=null; }
+
+  score=0;
+  heat=1;
+  extractionStarted=false;
+  extractionComplete=false;
+
+  // Start jet at one end of the range.
+  player.position.set(0, selectedVehicle === 'bomber' ? 16 : 14, 330);
+  player.rotation.y=0;
+
+  // Moving robotic targets patrol through trench lines and the open battlefield.
+  const rows = [
+    {z:215, xs:[-110,0,110], axis:'z', span:18, speed:1.10},
+    {z:130, xs:[-150,-75,0,75,150], axis:'x', span:20, speed:1.25},
+    {z:20,  xs:[-110,0,110], axis:'z', span:16, speed:1.05},
+    {z:-90, xs:[-150,-75,0,75,150], axis:'x', span:22, speed:1.35},
+    {z:-205,xs:[-110,0,110], axis:'z', span:18, speed:1.18}
+  ];
+
+  let idx=0;
+  for(const row of rows){
+    for(const x of row.xs){
+      const phase = idx * 0.7;
+      trainingTargets.push(
+        makeTrainingRobotTarget(x,row.z,idx++,row.axis,row.span,row.speed,phase)
+      );
+    }
+  }
+
+  // Unarmed enemy planes flying over the battlefield.
+  enemyPlanes.push(makeEnemyPlane(-185,18,165,0,'x',145,.55,0.0));
+  enemyPlanes.push(makeEnemyPlane(170,22,80,1,'z',120,.65,1.0));
+  enemyPlanes.push(makeEnemyPlane(-145,16,-35,2,'x',135,.60,2.1));
+  enemyPlanes.push(makeEnemyPlane(150,20,-175,3,'z',130,.58,3.2));
+
+  spawnEnemyBase();
+
+  ui.extractStatus.style.display='block';
+  ui.extractText.textContent=`🎯 TARGETS ${trainingTargets.length + enemyPlanes.length} • ✈️ PLANES ${enemyPlanes.length} • BASE ACTIVE`;
+  showMessage('TRENCH AIR RANGE');
+  updateHUD();
+}
+
+function restoreChaseMap(){
+  clearTrainingRange();
+  currentMap='chase';
+  enemyBaseRespawnTimer = 0;
+
+  scene.background.setHex(0x8fc8e8);
+  scene.fog.color.setHex(0x8fc8e8);
+  scene.fog.near = 120;
+  scene.fog.far = 430;
+  if(ground?.material) ground.material.color.setHex(0x7f8a59);
+  setSkyPalette('chase');
+
+  for(const r of roadStrips) r.mesh.visible=true;
+
+  ui.extractStatus.style.display='none';
+  showMessage('COP CHASE MAP');
+}
+
+function hitTrainingTargetsAt(position,radius,direct=false){
+  if(currentMap!=='range') return 0;
+
+  let hit=0;
+  for(let i=trainingTargets.length-1;i>=0;i--){
+    const target=trainingTargets[i];
+    const dx=target.position.x-position.x;
+    const dz=target.position.z-position.z;
+    const dy=(target.position.y+1.6)-position.y;
+
+    const horizontal=Math.hypot(dx,dz);
+    const touched = direct
+      ? (horizontal < 4.5 && Math.abs(dy)<5)
+      : horizontal < radius;
+
+    if(touched){
+      explodeAt(target.position.clone().add(new THREE.Vector3(0,1.2,0)));
+      scene.remove(target);
+      target.traverse(o=>{
+        if(o.geometry) o.geometry.dispose();
+        if(o.material) o.material.dispose();
+      });
+      trainingTargets.splice(i,1);
+      rangeTargetsDestroyed++;
+      hit++;
+      score += direct ? 650 : 450;
+    }
+  }
+
+  if(hit>0){
+    showMessage(direct ? `DIRECT TARGET HIT! +${hit*650}` : `TARGET HIT! +${hit*450}`);
+    ui.extractText.textContent=`🎯 TARGETS ${trainingTargets.length + enemyPlanes.length} • ✈️ PLANES ${enemyPlanes.length}`;
+
+    if(trainingTargets.length===0 && enemyPlanes.length===0){
+      showMessage('TARGET RANGE COMPLETE!');
+      ui.extractText.textContent='🏆 TARGET RANGE COMPLETE';
+    }
+  }
+
+  return hit;
+}
+
+function buildCity(){
+  // 15 pooled roads in each direction. They reposition around the player,
+  // creating an endless road grid without generating thousands of meshes.
+  for(let i=0;i<15;i++){
+    roadStrips.push({mesh:makeRoadStrip(true), vertical:true, slot:i-7});
+    roadStrips.push({mesh:makeRoadStrip(false), vertical:false, slot:i-7});
+  }
+
+  // Buildings removed: keep only the open baseplate and roads.
+  buildings = [];
+  cityCells = [];
+  obstacles = obstacles.filter(o => o.type !== 'building');
+
+  updateEndlessWorld();
+}
+
+function updateEndlessWorld(){
+  if(!player) return;
+
+  const baseX = 0;
+  const baseZ = 0;
+
+  for(const r of roadStrips){
+    if(r.vertical){
+      r.mesh.position.set((baseX+r.slot)*ROAD_SPACING, 0, 0);
+    } else {
+      r.mesh.position.set(0, 0, (baseZ+r.slot)*ROAD_SPACING);
+    }
+  }
+
+  // No building cells after the open-map update.
+  for(const cell of cityCells){
+    const gx = baseX + cell.ox;
+    const gz = baseZ + cell.oz;
+    const cx = (gx+.5)*ROAD_SPACING;
+    const cz = (gz+.5)*ROAD_SPACING;
+
+    // Keep a clear area around the escape runway.
+    const runwayClear =
+      runwayGroup &&
+      (runwayHorizontal
+        ? (Math.abs(cx-runwayCenter.x) < 135 && Math.abs(cz-runwayCenter.z) < 55)
+        : (Math.abs(cx-runwayCenter.x) < 55 && Math.abs(cz-runwayCenter.z) < 135));
+
+    cell.group.visible = !runwayClear;
+    cell.obstacle.disabled = runwayClear;
+    cell.group.position.set(cx,0,cz);
+    cell.obstacle.x = cx;
+    cell.obstacle.z = cz;
+  }
+}
+
+function spawnCop(){
+  if(cops.length >= 2 + heat*2) return;
+
+  const unlocked = getUnlockedPoliceTypes();
+
+  // Favor normal units, but occasionally spawn the newest unlocked vehicle.
+  let chosen;
+  if(unlocked.length > 1 && Math.random() < .38){
+    chosen = unlocked[unlocked.length-1];
+  } else {
+    chosen = unlocked[Math.floor(Math.random()*unlocked.length)];
+  }
+
+  const c = makePoliceVehicle(chosen.id);
+  const a = Math.random()*Math.PI*2;
+  const dist = 45 + Math.random()*35;
+  c.position.set(player.position.x+Math.sin(a)*dist,.45,player.position.z+Math.cos(a)*dist);
+  c.rotation.y = Math.atan2(
+    -(player.position.x-c.position.x),
+    -(player.position.z-c.position.z)
+  );
+  const fleetLevelBonus = 1 + Math.max(0,runsBeaten-6)*0.025;
+  c.userData.velocity = (15+heat*2+Math.random()*4) * c.userData.speedMult * fleetLevelBonus;
+  scene.add(c); cops.push(c);
+}
+
+
+const skidMat = new THREE.MeshBasicMaterial({
+  color:0x17191c,
+  transparent:true,
+  opacity:.58,
+  depthWrite:false,
+  polygonOffset:true,
+  polygonOffsetFactor:-2
+});
+
+function addSkidPair(){
+  if(!player || Math.abs(velocity) < 7 || Math.abs(steer) < .15 || !driftEnabled) return;
+
+  // Car local rear wheel locations converted into world positions.
+  const rearZ = 1.45;
+  const wheelX = .83;
+  const c = Math.cos(player.rotation.y), s = Math.sin(player.rotation.y);
+
+  for(const localX of [-wheelX, wheelX]){
+    const wx = player.position.x + localX*c + rearZ*s;
+    const wz = player.position.z - localX*s + rearZ*c;
+
+    const mark = new THREE.Mesh(new THREE.PlaneGeometry(.28, 1.5), skidMat.clone());
+    mark.rotation.x = -Math.PI/2;
+    mark.rotation.z = -player.rotation.y;
+    mark.position.set(wx, .045, wz);
+    scene.add(mark);
+    skidMarks.push(mark);
+  }
+
+  // Keep performance stable on laptops.
+  while(skidMarks.length > 260){
+    const old = skidMarks.shift();
+    scene.remove(old);
+    old.geometry.dispose();
+    old.material.dispose();
+  }
+}
+
+
+function makeCargoPlane(){
+  const g = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x6c747d, metalness:.35, roughness:.62});
+  const darkMat = new THREE.MeshStandardMaterial({color:0x252b31, metalness:.25, roughness:.55});
+  const glassMat = new THREE.MeshStandardMaterial({
+    color:0x7ec9ef, emissive:0x17384a, emissiveIntensity:.45,
+    transparent:true, opacity:.78, roughness:.18
+  });
+
+  const fuselage = new THREE.Mesh(new THREE.BoxGeometry(8,5.5,28), bodyMat);
+  fuselage.position.y = 3.6;
+  fuselage.castShadow = fuselage.receiveShadow = true;
+  g.add(fuselage);
+
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(7.2,4.4,5), bodyMat);
+  nose.position.set(0,4.1,-16.2);
+  nose.rotation.x = -.06;
+  nose.castShadow = true;
+  g.add(nose);
+
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(5.5,1.4,.18), glassMat);
+  cockpit.position.set(0,5.25,-18.68);
+  cockpit.rotation.x = -.08;
+  g.add(cockpit);
+
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(30,.7,7), bodyMat);
+  wing.position.set(0,4.4,-1);
+  wing.castShadow = true;
+  g.add(wing);
+
+  const tailWing = new THREE.Mesh(new THREE.BoxGeometry(13,.5,4), bodyMat);
+  tailWing.position.set(0,7.0,10.5);
+  g.add(tailWing);
+
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(.7,7,5), bodyMat);
+  fin.position.set(0,8.5,10.8);
+  fin.rotation.x = -.08;
+  g.add(fin);
+
+  // Four engine pods
+  for(const x of [-10,-5,5,10]){
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,4.5,16), darkMat);
+    pod.rotation.x = Math.PI/2;
+    pod.position.set(x,3.5,-2);
+    pod.castShadow = true;
+    g.add(pod);
+  }
+
+  // Rear ramp / open cargo bay
+  const bay = new THREE.Mesh(
+    new THREE.BoxGeometry(6.4,3.8,.2),
+    new THREE.MeshStandardMaterial({color:0x12161a, emissive:0x0a0d10, emissiveIntensity:.25})
+  );
+  bay.position.set(0,3.35,14.05);
+  g.add(bay);
+
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(6.4,.35,8), bodyMat);
+  ramp.position.set(0,1.05,17.5);
+  ramp.rotation.x = -.20;
+  ramp.castShadow = ramp.receiveShadow = true;
+  g.add(ramp);
+
+  // Interior floor visible through the rear
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(6.1,.25,10), darkMat);
+  floor.position.set(0,1.65,9.2);
+  g.add(floor);
+
+  // Rear guide lights
+  for(const x of [-2.5,2.5]){
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(.35,.35,.25),
+      new THREE.MeshStandardMaterial({color:0x65ff84, emissive:0x31ff5b, emissiveIntensity:3})
+    );
+    lamp.position.set(x,2.2,14.35);
+    g.add(lamp);
+  }
+
+  g.userData.ramp = ramp;
+  return g;
+}
+
+
+function makeObjectiveStar(){
+  const shape = new THREE.Shape();
+  const outer = 4.2, inner = 1.9;
+  for(let i=0;i<10;i++){
+    const a = -Math.PI/2 + i*Math.PI/5;
+    const r = i%2===0 ? outer : inner;
+    const x = Math.cos(a)*r, y = Math.sin(a)*r;
+    if(i===0) shape.moveTo(x,y); else shape.lineTo(x,y);
+  }
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape,{depth:.65,bevelEnabled:true,bevelSize:.16,bevelThickness:.16,bevelSegments:2});
+  geo.center();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color:0xffdf32,
+    emissive:0xffaa00,
+    emissiveIntensity:2.8,
+    metalness:.2,
+    roughness:.25
+  });
+
+  const star = new THREE.Mesh(geo,mat);
+  star.castShadow = true;
+
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.5,4.5,16,20,1,true),
+    new THREE.MeshBasicMaterial({color:0xffe66d,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide})
+  );
+  beam.position.y = -8;
+  star.add(beam);
+
+  return star;
+}
+
+
+function makeMassiveCheckpoint(){
+  const g = new THREE.Group();
+
+  const ringMat = new THREE.MeshStandardMaterial({
+    color:0x4de8ff,
+    emissive:0x00bfff,
+    emissiveIntensity:3.6,
+    metalness:.25,
+    roughness:.18
+  });
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(12,1.15,16,48), ringMat);
+  ring.rotation.y = Math.PI/2;
+  ring.position.y = 12;
+  g.add(ring);
+
+  const inner = new THREE.Mesh(
+    new THREE.TorusGeometry(9.5,.35,12,40),
+    new THREE.MeshStandardMaterial({
+      color:0xffffff,
+      emissive:0x71eaff,
+      emissiveIntensity:2.8,
+      roughness:.2
+    })
+  );
+  inner.rotation.y = Math.PI/2;
+  inner.position.y = 12;
+  g.add(inner);
+
+  for(const x of [-12,12]){
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5,24,1.5),
+      new THREE.MeshStandardMaterial({
+        color:0x183a47,
+        emissive:0x0b6f8a,
+        emissiveIntensity:1.4,
+        metalness:.45,
+        roughness:.38
+      })
+    );
+    pillar.position.set(x,12,0);
+    pillar.castShadow = true;
+    g.add(pillar);
+  }
+
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.5,8,70,24,1,true),
+    new THREE.MeshBasicMaterial({
+      color:0x56e8ff,
+      transparent:true,
+      opacity:.11,
+      depthWrite:false,
+      side:THREE.DoubleSide
+    })
+  );
+  beam.position.y = 35;
+  g.add(beam);
+
+  const topBar = new THREE.Mesh(
+    new THREE.BoxGeometry(18,1.0,1.0),
+    new THREE.MeshStandardMaterial({
+      color:0xffe03b,
+      emissive:0xffa500,
+      emissiveIntensity:2.6
+    })
+  );
+  topBar.position.set(0,26,0);
+  g.add(topBar);
+
+  scene.add(g);
+  return g;
+}
+
+function makeRunway(){
+  const g = new THREE.Group();
+
+  const runway = new THREE.Mesh(
+    new THREE.PlaneGeometry(42,240),
+    new THREE.MeshStandardMaterial({color:0x252a2f,roughness:.95})
+  );
+  runway.rotation.x = -Math.PI/2;
+  runway.position.y = .045;
+  runway.receiveShadow = true;
+  g.add(runway);
+
+  const edgeMat = new THREE.MeshBasicMaterial({color:0xf0f0f0});
+  for(const x of [-19,19]){
+    const edge = new THREE.Mesh(new THREE.PlaneGeometry(.45,230),edgeMat);
+    edge.rotation.x = -Math.PI/2;
+    edge.position.set(x,.06,0);
+    g.add(edge);
+  }
+
+  const centerMat = new THREE.MeshBasicMaterial({color:0xffffff});
+  for(let z=-105;z<=105;z+=18){
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(.65,8),centerMat);
+    line.rotation.x = -Math.PI/2;
+    line.position.set(0,.065,z);
+    g.add(line);
+  }
+
+  // Runway edge lights.
+  for(let z=-108;z<=108;z+=18){
+    for(const x of [-20,20]){
+      const light = new THREE.Mesh(
+        new THREE.BoxGeometry(.3,.18,.3),
+        new THREE.MeshStandardMaterial({color:0x8deaff,emissive:0x3abfe8,emissiveIntensity:2.2})
+      );
+      light.position.set(x,.13,z);
+      g.add(light);
+    }
+  }
+
+  scene.add(g);
+  return g;
+}
+
+function setupEscapeObjective(){
+  if(objectiveStar || runwayGroup || cargoPlane || massiveCheckpoint) return;
+
+  const forward = new THREE.Vector3(
+    -Math.sin(player.rotation.y),
+    0,
+    -Math.cos(player.rotation.y)
+  ).normalize();
+
+  runwayHorizontal = Math.abs(forward.x) > Math.abs(forward.z);
+  let runwayDir;
+
+  // Keep the extraction safely inside the finite baseplate.
+  if(runwayHorizontal){
+    const sx = forward.x >= 0 ? 1 : -1;
+    runwayDir = new THREE.Vector3(sx,0,0);
+    runwayCenter.set(
+      sx * 280,
+      0,
+      THREE.MathUtils.clamp(Math.round(player.position.z / ROAD_SPACING) * ROAD_SPACING, -260, 260)
+    );
+  } else {
+    const sz = forward.z >= 0 ? 1 : -1;
+    runwayDir = new THREE.Vector3(0,0,sz);
+    runwayCenter.set(
+      THREE.MathUtils.clamp(Math.round(player.position.x / ROAD_SPACING) * ROAD_SPACING, -260, 260),
+      0,
+      sz * 280
+    );
+  }
+
+  runwayYaw = Math.atan2(-runwayDir.x, -runwayDir.z);
+
+  runwayGroup = makeRunway();
+  runwayGroup.position.copy(runwayCenter);
+  runwayGroup.rotation.y = runwayYaw;
+
+  cargoPlane = makeCargoPlane();
+  cargoPlane.rotation.y = runwayYaw;
+  cargoPlane.position.copy(runwayCenter).addScaledVector(runwayDir,42);
+  cargoPlane.position.y = .15;
+  scene.add(cargoPlane);
+
+  objectivePos.copy(cargoPlane.position).addScaledVector(runwayDir,-20);
+  objectivePos.y = 0;
+
+  massiveCheckpoint = makeMassiveCheckpoint();
+  massiveCheckpoint.position.copy(objectivePos);
+  massiveCheckpoint.rotation.y = runwayYaw;
+
+  objectiveStar = makeObjectiveStar();
+  objectiveStar.position.set(objectivePos.x,18,objectivePos.z);
+  objectiveStar.scale.setScalar(1.35);
+  scene.add(objectiveStar);
+
+  objectiveReached = false;
+  extractionStarted = false;
+  extractionComplete = false;
+  cargoTaxiSpeed = 0;
+
+  ui.extractStatus.style.display = 'block';
+  ui.extractText.textContent = '⭐ MASSIVE CHECKPOINT + CARGO PLANE SPAWNED';
+  showMessage('10,000! MASSIVE ESCAPE CHECKPOINT SPAWNED!');
+  updateEndlessWorld();
+}
+
+function updateObjective(dt,t){
+  if(!objectiveStar || extractionComplete) return;
+
+  objectiveStar.rotation.y += dt*1.8;
+
+  if(massiveCheckpoint){
+    const pulse = 3.1 + Math.sin(t*4)*.8;
+    if(massiveCheckpoint.children[0]?.material) massiveCheckpoint.children[0].material.emissiveIntensity = pulse;
+    if(massiveCheckpoint.children[1]?.material) massiveCheckpoint.children[1].material.emissiveIntensity = 2.4 + Math.sin(t*4+1)*.6;
+  }
+  objectiveStar.rotation.z = Math.sin(t*1.6)*.08;
+  objectiveStar.position.y = 10 + Math.sin(t*2.5)*1.1;
+
+  const dx = player.position.x-objectivePos.x;
+  const dz = player.position.z-objectivePos.z;
+  const dist = Math.hypot(dx,dz);
+
+  if(!objectiveReached){
+    ui.extractText.textContent = `⭐ MASSIVE CHECKPOINT • ${Math.round(dist)}m`;
+    if(dist < 42){
+      startExtraction();
+    }
+  }
+}
+
+function startExtraction(){
+  if(extractionStarted || extractionComplete) return;
+
+  extractionStarted = true;
+  objectiveReached = true;
+  cargoTaxiSpeed = 0;
+  ui.extractStatus.style.display = 'block';
+  ui.extractText.textContent = (selectedVehicle === 'helicopter' || selectedVehicle === 'jet' || selectedVehicle === 'bomber')
+    ? '⭐ OBJECTIVE REACHED — FLY TO THE REAR OF THE PLANE!'
+    : '⭐ OBJECTIVE REACHED — DRIVE INTO THE PLANE!';
+  showMessage('CHECKPOINT REACHED! BOARD THE PLANE!');
+}
+
+function updateExtraction(dt){
+  if(!extractionStarted || extractionComplete || !cargoPlane) return;
+
+  ui.extractText.textContent = (selectedVehicle === 'helicopter' || selectedVehicle === 'jet' || selectedVehicle === 'bomber')
+    ? 'FLY TO THE REAR OF THE CARGO PLANE!'
+    : 'DRIVE INTO THE REAR CARGO RAMP!';
+
+  // Rear-entry trigger based on local plane coordinates.
+  const local = cargoPlane.worldToLocal(player.position.clone());
+  const insideRamp =
+    Math.abs(local.x) < 3.15 &&
+    local.z > 13.0 && local.z < 22.8 &&
+    local.y < 3.6;
+
+  const helicopterExtraction =
+    (selectedVehicle === 'helicopter' || selectedVehicle === 'jet' || selectedVehicle === 'bomber') &&
+    Math.abs(local.x) < 7.0 &&
+    local.z > 11.0 && local.z < 26.0 &&
+    local.y < 11.0;
+
+  if(insideRamp || helicopterExtraction){
+    finishRun();
+  }
+}
+
+function updateEscapeCutscene(dt){
+  if(!escapeCutscene || !cargoPlane) return;
+
+  cutsceneTimer += dt;
+
+  // Close the rear ramp during the first second.
+  if(cargoPlane.userData.ramp){
+    const closeTarget = 1.08;
+    cargoPlane.userData.ramp.rotation.x = THREE.MathUtils.lerp(
+      cargoPlane.userData.ramp.rotation.x,
+      closeTarget,
+      1 - Math.pow(0.0008, dt)
+    );
+  }
+
+  // Plane moves forward along its nose direction (local -Z).
+  const forward = new THREE.Vector3(Math.sin(cargoPlane.rotation.y), 0, Math.cos(cargoPlane.rotation.y));
+  const takeoffSpeed = cutsceneTimer < 1.4 ? 17 : cutsceneTimer < 2.8 ? 26 : 38;
+
+  cargoPlane.position.addScaledVector(forward, -takeoffSpeed * dt);
+
+  // Start climbing after a short roll.
+  if(cutsceneTimer > 1.5){
+    const climb = Math.min(16, (cutsceneTimer - 1.5) * 7.5);
+    cargoPlane.position.y += climb * dt;
+    cargoPlane.rotation.x = THREE.MathUtils.lerp(cargoPlane.rotation.x, -0.22, 1 - Math.pow(0.003, dt));
+  }
+
+  ui.extractText.textContent = cutsceneTimer < 1.3 ? 'RAMP CLOSING...' :
+                               cutsceneTimer < 2.5 ? 'TAKING OFF...' :
+                               'ESCAPING INTO THE SKY!';
+
+  // Cinematic camera follow on the plane.
+  const camOffset = new THREE.Vector3(0, 7.5, 22);
+  const camWorld = camOffset.clone().applyAxisAngle(new THREE.Vector3(0,1,0), cargoPlane.rotation.y);
+  const camTarget = cargoPlane.position.clone().add(camWorld);
+  camera.position.lerp(camTarget, 1 - Math.pow(0.0007, dt));
+
+  if(cameraPunch > 0){
+    camera.position.x += (Math.random()-.5) * cameraPunch;
+    camera.position.y += (Math.random()-.5) * cameraPunch * .55;
+  }
+
+  camera.lookAt(cargoPlane.position.clone().add(new THREE.Vector3(0, 4.2, -10)));
+
+  if(cutsceneTimer > 5.4){
+    escapeCutscene = false;
+    ui.extractText.textContent = 'EXTRACTION COMPLETE';
+    awardFinishUpgrades();
+    ui.gameover.style.display = 'grid';
+  }
+}
+
+function finishRun(){
+  if(extractionComplete) return;
+  extractionComplete = true;
+  running = false;
+  velocity = 0;
+  escapeCutscene = true;
+  cutsceneTimer = 0;
+  player.visible = false;
+  ui.extractText.textContent = 'BOARDING COMPLETE';
+  showMessage('GETAWAY!');
+  ui.gameover.style.display = 'none';
+
+  // Clear the pursuing police so the cutscene feels clean.
+  for(const c of cops){
+    removeCopHealthBar(c);
+    scene.remove(c);
+  }
+  cops = [];
+  if(bombReticle) bombReticle.visible = false;
+  if(jetTargetReticle) jetTargetReticle.visible = false;
+
+  for(const m of missiles){
+    scene.remove(m);
+    if(m.geometry) m.geometry.dispose();
+    if(m.material) m.material.dispose();
+  }
+  missiles=[];
+
+  for(const b of bullets){
+    scene.remove(b);
+    b.geometry.dispose();
+    b.material.dispose();
+  }
+  bullets = [];
+  machineGunHeld = false;
+  aircraftGunCooldown = 0;
+}
+
+
+function refreshUpgradeStats(){
+  maxHealth = 100 + upgrades.armor * 20;
+  maxBoost = 100 + upgrades.nitro * 25;
+}
+
+function updateUpgradeShop(){
+  refreshUpgradeStats();
+
+  ui.upgradePoints.textContent = upgradePoints;
+  ui.engineLevel.textContent = `Lv. ${upgrades.engine}`;
+  ui.accelLevel.textContent = `Lv. ${upgrades.accel}`;
+  ui.armorLevel.textContent = `Lv. ${upgrades.armor}`;
+  ui.nitroLevel.textContent = `Lv. ${upgrades.nitro}`;
+
+  const unlockedNames = getUnlockedPoliceTypes().map(v=>v.name);
+  const nextGunnerAt = (Math.floor(runsBeaten/2)+1)*2;
+  const currentGunner = Math.floor(runsBeaten/2);
+
+  ui.fleetText.textContent =
+    `Runs beaten: ${runsBeaten} • Police vehicles next run: ${unlockedNames.join(', ')}` +
+    (runsBeaten >= policeFleet.length ? ` • Fleet Level ${runsBeaten-policeFleet.length+2}` : '') +
+    ` • Front Gunner: ${currentGunner > 0 ? `Lv.${currentGunner}` : 'Locked'} ` +
+    `${runsBeaten < nextGunnerAt ? `(next level at ${nextGunnerAt} runs)` : ''}`;
+
+  ui.vehicleChoice.style.display = runsBeaten >= 3 ? 'block' : 'none';
+  document.getElementById('devApply').addEventListener('click',applyDevMenu);
+document.getElementById('devResetSpeed').addEventListener('click',resetDevSpeed);
+document.getElementById('devSpeed').addEventListener('input',updateDevSpeedLabel);
+
+document.querySelectorAll('.vehicleBtn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.vehicle === selectedVehicle);
+    btn.disabled = runsBeaten < 3 && btn.dataset.vehicle === 'helicopter';
+  });
+
+  if(runsBeaten >= 3){
+    ui.vehicleHelp.textContent = selectedVehicle === 'helicopter'
+      ? 'Selected: HELICOPTER — WASD to fly, hold SPACE to climb, B bombs, C changes view.'
+      : selectedVehicle === 'jet'
+      ? 'Selected: JET — hold LMB machine gun, E missiles, SPACE climbs, C changes view. Enemy planes have no guns.'
+      : selectedVehicle === 'bomber'
+      ? 'Selected: BOMBER — hold LMB machine gun, B bombs, 6-bomb bay, 9-second reload, SPACE climbs, C changes view.'
+      : 'Selected: CAR — drift with Space, E fires the gunner, C changes view.';
+  }
+
+  document.querySelectorAll('.upgradeBtn').forEach(btn=>{
+    const type = btn.dataset.upgrade;
+    const maxed = upgrades[type] >= 5;
+    btn.disabled = upgradePoints < 1 || maxed;
+    btn.textContent = maxed ? 'MAX LEVEL' : 'UPGRADE — 1 POINT';
+  });
+}
+
+function awardFinishUpgrades(){
+  if(runRewarded) return;
+  runRewarded = true;
+
+  // Every successful escape gives at least 4 points; high scores give more.
+  const earned = Math.max(4, Math.floor(score / 2500));
+  upgradePoints += earned;
+
+  const oldRuns = runsBeaten;
+  runsBeaten++;
+
+  let unlockMessage = '';
+
+  if(runsBeaten === 3){
+    unlockMessage += `<br><br>🚁 NEW VEHICLE UNLOCKED:<br><b>HELICOPTER</b> — choose it in the garage. Press <b>B</b> to drop bombs.`;
+  }
+
+  if(runsBeaten % 2 === 0){
+    const newGunnerLevel = Math.floor(runsBeaten/2);
+    unlockMessage += `<br><br>🔧 FRONT GUNNER ${newGunnerLevel === 1 ? 'UNLOCKED' : 'UPGRADED'}:<br>` +
+                     `<b>Level ${newGunnerLevel}</b> — press <b>E</b> to fire.`;
+  }
+
+  if(runsBeaten < policeFleet.length){
+    const unlocked = policeFleet[runsBeaten];
+    unlockMessage += `<br><br>🚓 NEW COP VEHICLE UNLOCKED:<br><b>${unlocked.name}</b>`;
+  } else if(runsBeaten === policeFleet.length){
+    const unlocked = policeFleet[policeFleet.length-1];
+    unlockMessage += `<br><br>🚨 FINAL COP VEHICLE UNLOCKED:<br><b>${unlocked.name}</b>`;
+  } else {
+    unlockMessage += `<br><br>🚨 POLICE FLEET LEVEL UP!<br><b>Fleet Level ${runsBeaten-policeFleet.length+2}</b> — all cops get slightly faster and stronger.`;
+  }
+
+  ui.gameoverTitle.innerHTML = 'RUN <span class="accent">COMPLETE</span>';
+  ui.upgradeShop.style.display = 'block';
+  ui.finalText.innerHTML =
+    `Final Score: <b>${Math.floor(score).toLocaleString()}</b><br>` +
+    `Cargo-plane escape complete.<br><br>` +
+    `<b>+${earned} UPGRADE POINT${earned === 1 ? '' : 'S'}</b>` +
+    unlockMessage;
+
+  updateUpgradeShop();
+}
+
+function buyUpgrade(type){
+  if(!upgrades.hasOwnProperty(type)) return;
+  if(upgradePoints < 1 || upgrades[type] >= 5) return;
+
+  upgradePoints--;
+  upgrades[type]++;
+  refreshUpgradeStats();
+  updateUpgradeShop();
+}
+
+
+function toggleDevMenu(){
+  devMenuOpen = !devMenuOpen;
+  ui.devMenu.classList.toggle('open',devMenuOpen);
+
+  if(devMenuOpen){
+    ui.devScore.value = Math.floor(score);
+    ui.devMap.value = currentMap;
+    ui.devVehicle.value = selectedVehicle;
+    ui.devSpeed.value = Math.round(devSpeedKmh);
+    updateDevSpeedLabel();
+  }
+}
+
+function updateDevSpeedLabel(){
+  const value = Number(ui.devSpeed.value || 0);
+  ui.devSpeedValue.textContent = value <= 0
+    ? 'Normal speed'
+    : `${value} km/h override`;
+}
+
+function applyDevMenu(){
+  const requestedMap = ui.devMap.value;
+  let requestedVehicle = ui.devVehicle.value;
+
+  if(requestedMap === 'range' && !['jet','bomber'].includes(requestedVehicle)){
+    requestedVehicle = 'bomber';
+    ui.devVehicle.value = 'bomber';
+  }
+
+  if(requestedMap === 'range' && currentMap !== 'range'){
+    selectedVehicle = requestedVehicle;
+    setupTrainingRange();
+  } else if(requestedMap === 'chase' && currentMap !== 'chase'){
+    restoreChaseMap();
+  }
+
+  const newScore = Math.max(0, Number(ui.devScore.value || 0));
+  score = newScore;
+
+  devSpeedKmh = Math.max(0, Number(ui.devSpeed.value || 0));
+
+  if(['car','helicopter','jet','bomber'].includes(requestedVehicle) && requestedVehicle !== selectedVehicle){
+    selectedVehicle = requestedVehicle;
+    rebuildPlayerVehicle();
+  }
+
+  if(selectedVehicle === 'bomber' && bomberBombAmmo <= 0 && bomberReloadTimer <= 0){
+    bomberBombAmmo = BOMBER_MAX_BOMBS;
+  }
+
+  if(selectedVehicle === 'car' && devSpeedKmh > 0){
+    velocity = devSpeedKmh / 8.2;
+  }
+
+  showMessage(
+    `DEV: ${currentMap === 'range' ? 'TRENCH AIR RANGE' : selectedVehicle.toUpperCase()} • SCORE ${Math.floor(score)} • ` +
+    `${devSpeedKmh > 0 ? devSpeedKmh+' KM/H' : 'NORMAL SPEED'}`
+  );
+  updateHUD();
+}
+
+function resetDevSpeed(){
+  devSpeedKmh = 0;
+  ui.devSpeed.value = 0;
+  updateDevSpeedLabel();
+  showMessage('DEV SPEED RESET');
+}
+
+function resetGame(){
+  clearTrainingRange();
+
+  for(const c of cops){
+    removeCopHealthBar(c);
+    scene.remove(c);
+  }
+  cops=[];
+
+  for(const b of bullets){
+    scene.remove(b);
+    b.geometry.dispose();
+    b.material.dispose();
+  }
+  bullets=[];
+  gunCooldown=0;
+  aircraftGunCooldown=0;
+  machineGunHeld=false;
+  if(bombReticle) bombReticle.visible = false;
+  if(jetTargetReticle) jetTargetReticle.visible = false;
+
+  for(const m of missiles){
+    scene.remove(m);
+    if(m.geometry) m.geometry.dispose();
+    if(m.material) m.material.dispose();
+  }
+  missiles=[];
+  missileCooldown=0;
+
+  for(const b of bombs){
+    scene.remove(b);
+    if(b.geometry) b.geometry.dispose();
+    if(b.material) b.material.dispose();
+  }
+  bombs=[];
+  bomberBombAmmo = BOMBER_MAX_BOMBS;
+  bomberReloadTimer = 0;
+  enemyBaseRespawnTimer = 0;
+
+  for(const ex of explosions){
+    scene.remove(ex.group);
+    ex.group.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material) o.material.dispose();
+    });
+  }
+  explosions=[];
+  bombCooldown=0;
+  if(runsBeaten >= 3){
+    rebuildPlayerVehicle();
+  } else if(selectedVehicle !== 'car'){
+    selectedVehicle = 'car';
+    rebuildPlayerVehicle();
+  }
+
+  player.position.set(
+    0,
+    selectedVehicle === 'bomber' ? 14.0 : selectedVehicle === 'jet' ? 10.0 : selectedVehicle === 'helicopter' ? 7.0 : .45,
+    0
+  );
+  player.rotation.set(0,0,0);
+  player.userData.moveDir = new THREE.Vector3(0,0,1);
+  driftEnabled = true;
+  skidTimer = 0;
+  ankleMultiplierTimer = 0;
+  ankleCombo = 0;
+  ankleComboTimer = 0;
+  cameraPunch = 0;
+  extractionStarted = false;
+  extractionComplete = false;
+  escapeCutscene = false;
+  cutsceneTimer = 0;
+  runRewarded = false;
+  player.visible = true;
+  ui.extractStatus.style.display = 'none';
+  ui.upgradeShop.style.display = 'none';
+  ui.gameoverTitle.innerHTML = 'CHASE <span class="accent">OVER</span>';
+  if(objectiveStar){
+    scene.remove(objectiveStar);
+    objectiveStar = null;
+  }
+  if(massiveCheckpoint){
+    scene.remove(massiveCheckpoint);
+    massiveCheckpoint = null;
+  }
+  if(runwayGroup){
+    scene.remove(runwayGroup);
+    runwayGroup = null;
+  }
+  if(cargoPlane){
+    scene.remove(cargoPlane);
+    cargoPlane = null;
+  }
+  cargoTarget = null;
+  cargoTaxiSpeed = 0;
+  for(const m of skidMarks){
+    scene.remove(m);
+    m.geometry.dispose();
+    m.material.dispose();
+  }
+  skidMarks = [];
+  refreshUpgradeStats();
+  refreshGunner();
+  objectiveReached = false;
+  runwayHorizontal = false;
+  runwayYaw = 0;
+  velocity=0; steer=0; health=maxHealth; score=0; heat=1; boost=maxBoost;
+  copSpawnTimer=0; scoreTimer=0;
+  ui.gameover.style.display='none';
+  running=true; lastTime=performance.now();
+  updateHUD();
+  if(currentMap === 'range'){
+    setupTrainingRange();
+  }
+
+}
+
+function showMessage(t){
+  ui.msg.textContent=t;
+  ui.msg.classList.remove('show');
+  void ui.msg.offsetWidth;
+  ui.msg.classList.add('show');
+  messageTimer=1.35;
+}
+
+function damage(amount){
+  health=Math.max(0,health-amount);
+  if(health<=0) endGame();
+}
+
+function endGame(){
+  running=false;
+  ui.gameoverTitle.innerHTML = 'CHASE <span class="accent">OVER</span>';
+  ui.upgradeShop.style.display = 'none';
+  ui.finalText.innerHTML=`Score: <b>${Math.floor(score)}</b><br>Wanted level reached: <b>${heat}★</b><br><br>Follow the glowing ⭐ objective and reach the cargo plane to complete the run.`;
+  ui.gameover.style.display='grid';
+}
+
+function updateHUD(){
+  if(currentMap === 'range'){
+    ui.extractStatus.style.display='block';
+    const baseText = enemyBase
+      ? `BASE ${Math.ceil(enemyBase.userData.hp ?? ENEMY_BASE_MAX_HP)}/${ENEMY_BASE_MAX_HP} HP`
+      : `BASE RESPAWN ${enemyBaseRespawnTimer.toFixed(1)}s`;
+    const totalTargets = trainingTargets.length + enemyPlanes.length;
+    ui.extractText.textContent = totalTargets > 0
+      ? `🎯 TARGETS ${totalTargets} • ✈️ PLANES ${enemyPlanes.length} • ${baseText}`
+      : `🏆 RANGE CLEAR • ${baseText}`;
+  }
+
+  ui.score.textContent=Math.floor(score).toLocaleString();
+  ui.speed.textContent=Math.round(Math.abs(velocity)*8.2);
+  const hpPercent = maxHealth > 0 ? (health/maxHealth)*100 : 0;
+  ui.healthText.textContent=Math.round(hpPercent)+'%';
+  ui.healthBar.style.transform=`scaleX(${THREE.MathUtils.clamp(health/maxHealth,0,1)})`;
+  ui.stars.textContent='★'.repeat(heat)+'☆'.repeat(Math.max(0,5-heat));
+  ui.driftText.textContent = driftEnabled ? 'ON' : 'OFF';
+  ui.driftText.style.color = driftEnabled ? '#5de1ff' : '#ffffff';
+  const mult = ankleMultiplierTimer > 0 ? Math.min(3, 1 + ankleCombo) : 1;
+  ui.multiplierText.textContent = mult + '×';
+  ui.multiplierText.style.color = mult > 1 ? '#ffd43b' : '#ffffff';
+  ui.comboText.textContent = ankleCombo;
+  ui.comboText.style.color = ankleCombo > 0 ? '#5de1ff' : '#ffffff';
+
+  if(currentMap === 'chase' && !objectiveStar && !extractionStarted && !extractionComplete){
+    ui.extractStatus.style.display = 'block';
+    ui.extractText.textContent = `⭐ OBJECTIVE UNLOCKS AT 10,000 • ${Math.max(0,10000-Math.floor(score)).toLocaleString()} LEFT`;
+  }
+
+  if(selectedVehicle === 'helicopter'){
+    ui.gunnerText.textContent = `BOMBS • ${bombCooldown > 0 ? 'RELOADING' : 'READY'} • B`;
+    ui.gunnerText.style.color = '#ffd43b';
+  } else if(selectedVehicle === 'bomber'){
+    ui.gunnerText.textContent = bomberReloadTimer > 0
+      ? `MG LMB • BOMBS 0/${BOMBER_MAX_BOMBS} • RELOAD ${bomberReloadTimer.toFixed(1)}s`
+      : `MG LMB • BOMBS ${bomberBombAmmo}/${BOMBER_MAX_BOMBS} • B`;
+    ui.gunnerText.style.color = bomberReloadTimer > 0 ? '#ff9f43' : '#ffd43b';
+  } else if(selectedVehicle === 'jet'){
+    ui.gunnerText.textContent = `MG LMB • MISSILES ${missileCooldown > 0 ? 'RELOADING' : 'READY'} • E`;
+    ui.gunnerText.style.color = '#5de1ff';
+  } else {
+    ui.gunnerText.textContent = gunnerLevel > 0
+      ? `LV.${gunnerLevel} • ${gunCooldown > 0 ? 'RELOADING' : 'READY'}`
+      : 'LOCKED • BEAT 2 RUNS';
+    ui.gunnerText.style.color = gunnerLevel > 0 ? '#ffd43b' : '#ffffff';
+  }
+}
+
+function isOnRoad(pos){
+  return Math.abs(pos.x)<27 || Math.abs(pos.z)<27;
+}
+
+
+function copTouchesJet(c){
+  if((selectedVehicle !== 'jet' && selectedVehicle !== 'bomber') || !player?.userData?.jetHitbox) return false;
+
+  // Police cars are near ground level; altitude now matters.
+  const copCenterY = c.position.y + 1.0;
+  const jetCenterY = player.position.y + 1.5;
+  const hb = player.userData.jetHitbox;
+
+  if(Math.abs(copCenterY - jetCenterY) > hb.verticalHalfHeight + 1.15){
+    return false;
+  }
+
+  // Convert police-car position into the jet's local coordinates,
+  // so the hitbox rotates correctly with the jet.
+  const local = player.worldToLocal(c.position.clone());
+
+  // Give police cars a little radius so contact feels fair.
+  const copRadius = 1.25;
+  const ax = Math.abs(local.x);
+
+  const fuselage =
+    ax < hb.bodyHalfWidth + copRadius &&
+    local.z > hb.noseZ - copRadius &&
+    local.z < hb.tailZ + copRadius;
+
+  const mainWings =
+    ax < hb.wingHalfWidth + copRadius &&
+    local.z > hb.wingMinZ - copRadius &&
+    local.z < hb.wingMaxZ + copRadius;
+
+  const tailWings =
+    ax < hb.tailHalfWidth + copRadius &&
+    local.z > hb.tailMinZ - copRadius &&
+    local.z < hb.tailMaxZ + copRadius;
+
+  return fuselage || mainWings || tailWings;
+}
+
+function collisionCheck(){
+  for(const o of obstacles){
+    if(o.disabled) continue;
+    const dx=player.position.x-o.x, dz=player.position.z-o.z;
+    const rr=o.r+1.25;
+    if(dx*dx+dz*dz < rr*rr){
+      const len=Math.hypot(dx,dz)||1;
+      player.position.x=o.x+(dx/len)*rr;
+      player.position.z=o.z+(dz/len)*rr;
+      if(Math.abs(velocity)>4){
+        damage(o.type==='building'?10:4);
+        velocity*=-.28;
+        showMessage(o.type==='building'?'CRASH!':'BUMP!');
+      }
+    }
+  }
+}
+
+function updatePlayer(dt){
+  const forward = keys['KeyW']||keys['ArrowUp'];
+  const back = keys['KeyS']||keys['ArrowDown'];
+  const left = keys['KeyA']||keys['ArrowLeft'];
+  const right = keys['KeyD']||keys['ArrowRight'];
+  const boosting = (keys['ShiftLeft']||keys['ShiftRight']) && forward;
+
+  if(selectedVehicle === 'bomber'){
+    const left = keys['KeyA']||keys['ArrowLeft'];
+    const right = keys['KeyD']||keys['ArrowRight'];
+    const back = keys['KeyS']||keys['ArrowDown'];
+    const rising = keys['Space'];
+
+    const turn = (left?1:0)-(right?1:0);
+    player.rotation.y += turn * .72 * dt;
+
+    let flySpeed = 36 + upgrades.engine*2.8;
+    if(boosting) flySpeed += 13 + upgrades.nitro*1.1;
+    if(devSpeedKmh > 0) flySpeed = devSpeedKmh/8.2;
+
+    const dir = new THREE.Vector3(-Math.sin(player.rotation.y),0,-Math.cos(player.rotation.y));
+
+    if(forward) player.position.addScaledVector(dir, flySpeed*dt);
+    if(back) player.position.addScaledVector(dir,-flySpeed*.18*dt);
+
+    if(rising){
+      player.position.y += 9.5*dt;
+    } else {
+      player.position.y = THREE.MathUtils.lerp(
+        player.position.y,
+        14.0,
+        1-Math.pow(.24,dt)
+      );
+    }
+
+    player.position.y = THREE.MathUtils.clamp(player.position.y,9,58);
+    player.position.x = THREE.MathUtils.clamp(player.position.x,-420,420);
+    player.position.z = THREE.MathUtils.clamp(player.position.z,-418,418);
+
+    if(player.userData.props){
+      for(const p of player.userData.props) p.rotation.z += 24*dt;
+    }
+
+    updateEndlessWorld();
+
+    const scoreMult = ankleMultiplierTimer > 0 ? Math.min(3,1+ankleCombo) : 1;
+    score += (forward ? flySpeed : 4) * dt * .9 * scoreMult;
+    velocity = forward ? flySpeed : 0;
+    return;
+  }
+
+  if(selectedVehicle === 'jet'){
+    const left = keys['KeyA']||keys['ArrowLeft'];
+    const right = keys['KeyD']||keys['ArrowRight'];
+    const back = keys['KeyS']||keys['ArrowDown'];
+    const rising = keys['Space'];
+
+    const turn = (left?1:0)-(right?1:0);
+    player.rotation.y += turn * 1.25 * dt;
+
+    let flySpeed = 58 + upgrades.engine*4.5;
+    if(boosting) flySpeed += 30 + upgrades.nitro*2.0;
+    if(devSpeedKmh > 0) flySpeed = devSpeedKmh/8.2;
+
+    const dir = new THREE.Vector3(-Math.sin(player.rotation.y),0,-Math.cos(player.rotation.y));
+
+    if(forward) player.position.addScaledVector(dir, flySpeed*dt);
+    if(back) player.position.addScaledVector(dir,-flySpeed*.28*dt);
+
+    if(rising){
+      player.position.y += 14*dt;
+    } else {
+      player.position.y = THREE.MathUtils.lerp(
+        player.position.y,
+        10.5,
+        1-Math.pow(.22,dt)
+      );
+    }
+
+    player.position.y = THREE.MathUtils.clamp(player.position.y,7,65);
+
+    // Keep the whole jet (including wings) inside the finite baseplate.
+    player.position.x = THREE.MathUtils.clamp(player.position.x,-424,424);
+    player.position.z = THREE.MathUtils.clamp(player.position.z,-422,422);
+
+    updateEndlessWorld();
+
+    const scoreMult = ankleMultiplierTimer > 0 ? Math.min(3,1+ankleCombo) : 1;
+    score += (forward ? flySpeed : 5) * dt * 1.05 * scoreMult;
+    velocity = forward ? flySpeed : 0;
+    return;
+  }
+
+  if(selectedVehicle === 'helicopter'){
+    const left = keys['KeyA']||keys['ArrowLeft'];
+    const right = keys['KeyD']||keys['ArrowRight'];
+    const back = keys['KeyS']||keys['ArrowDown'];
+    const rising = keys['Space'];
+
+    const turn = (left?1:0)-(right?1:0);
+    player.rotation.y += turn * 1.65 * dt;
+
+    let flySpeed = 22 + upgrades.engine*2.2;
+    if(boosting) flySpeed += 8 + upgrades.nitro*.7;
+    if(devSpeedKmh > 0) flySpeed = devSpeedKmh/8.2;
+
+    const dir = new THREE.Vector3(-Math.sin(player.rotation.y),0,-Math.cos(player.rotation.y));
+    if(forward) player.position.addScaledVector(dir, flySpeed*dt);
+    if(back) player.position.addScaledVector(dir,-flySpeed*.55*dt);
+
+    // Hold Spacebar to climb.
+    if(rising){
+      player.position.y += (9.5 + upgrades.engine*.35) * dt;
+    } else {
+      // Slowly settle back toward cruising altitude when Space is released.
+      const cruiseHeight = 7.5 + Math.sin(performance.now()/280)*.22;
+      player.position.y = THREE.MathUtils.lerp(player.position.y, cruiseHeight, 1-Math.pow(.18,dt));
+    }
+
+    player.position.y = THREE.MathUtils.clamp(player.position.y,5.5,45);
+
+    if(player.userData.mainRotor) player.userData.mainRotor.rotation.y += 18*dt;
+    if(player.userData.tailRotor) player.userData.tailRotor.rotation.x += 22*dt;
+
+    updateEndlessWorld();
+
+    const scoreMult = ankleMultiplierTimer > 0 ? Math.min(3,1+ankleCombo) : 1;
+    score += (forward ? flySpeed : 3) * dt * .8 * scoreMult;
+    velocity = forward ? flySpeed : 0;
+    return;
+  }
+
+  const onRoad=isOnRoad(player.position);
+  const engineBonus = upgrades.engine * 3.2;
+  const accelBonus = upgrades.accel * 2.7;
+  const boostSpeedBonus = upgrades.nitro * 0.9;
+
+  const normalMaxSpeed=(onRoad?31+engineBonus:19+engineBonus*.6)+(boosting?9+boostSpeedBonus:0);
+  const maxSpeed = devSpeedKmh > 0 ? devSpeedKmh/8.2 : normalMaxSpeed;
+  const accel=(onRoad?19:11)+accelBonus;
+
+  if(forward) velocity += (devSpeedKmh > 0 ? Math.max(accel,36) : accel)*dt;
+  if(back) velocity -= (velocity>1?30:12)*dt;
+  if(!forward&&!back) velocity *= Math.pow(.18,dt);
+  velocity = THREE.MathUtils.clamp(velocity,-10,maxSpeed);
+
+  // Infinite boost: Shift can be held forever.
+  boost = maxBoost;
+  if(boosting){
+    velocity += (14 + upgrades.nitro*1.1)*dt;
+  }
+
+  const steerTarget=(left?1:0)-(right?1:0);
+  steer=THREE.MathUtils.lerp(steer,steerTarget,1-Math.pow(.001,dt));
+
+  const speedFactor=Math.min(1,Math.abs(velocity)/7);
+
+  if(driftEnabled){
+    // Drift mode: the car rotates faster than its movement direction,
+    // making the back end slide outward through corners.
+    player.rotation.y += steer * dt * 2.8 * speedFactor * (velocity>=0?1:-1);
+
+    const dir = new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
+    if(!player.userData.moveDir) player.userData.moveDir = dir.clone();
+
+    // Slow grip recovery = more sideways slide.
+    player.userData.moveDir.lerp(dir, Math.max(.012, .72*dt)).normalize();
+
+    // Extra lateral kick makes the drift obvious.
+    const side = new THREE.Vector3(dir.z,0,-dir.x);
+    const sidewaysSlip = steer * Math.min(Math.abs(velocity),30) * .17;
+    player.position.addScaledVector(side, sidewaysSlip*dt);
+    player.position.addScaledVector(player.userData.moveDir,-velocity*dt);
+
+    skidTimer -= dt;
+    if(Math.abs(steer) > .18 && Math.abs(velocity) > 7 && skidTimer <= 0){
+      addSkidPair();
+      skidTimer = .045;
+    }
+  } else {
+    // Grip mode: movement follows the car closely with almost no slide.
+    player.rotation.y += steer * dt * 1.65 * speedFactor * (velocity>=0?1:-1);
+    const dir = new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
+    if(!player.userData.moveDir) player.userData.moveDir = dir.clone();
+    player.userData.moveDir.lerp(dir, Math.min(1,9*dt)).normalize();
+    player.position.addScaledVector(player.userData.moveDir,-velocity*dt);
+  }
+
+  updateEndlessWorld();
+  collisionCheck();
+
+  // Normal finite baseplate bounds.
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-430,430);
+  player.position.z=THREE.MathUtils.clamp(player.position.z,-430,430);
+
+  const scoreMult = ankleMultiplierTimer > 0 ? Math.min(3, 1 + ankleCombo) : 1;
+  score += Math.abs(velocity)*dt*(onRoad?1.1:.55)*scoreMult;
+}
+
+function updateCops(dt,t){
+  for(let i=cops.length-1;i>=0;i--){
+    const c=cops[i];
+    c.userData.hitCooldown=Math.max(0,c.userData.hitCooldown-dt);
+    c.userData.ankleArmed=Math.max(0,c.userData.ankleArmed-dt);
+    c.userData.ankleCooldown=Math.max(0,c.userData.ankleCooldown-dt);
+
+    const dx=player.position.x-c.position.x;
+    const dz=player.position.z-c.position.z;
+    const dist=Math.hypot(dx,dz);
+
+    // ANKLE BREAKER:
+    // Arm the trick when a cop is very close and the player commits to a sharp turn.
+    const playerDir = new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
+    const copDir = new THREE.Vector3(Math.sin(c.rotation.y),0,Math.cos(c.rotation.y));
+    const toPlayer = new THREE.Vector3(dx,0,dz).normalize();
+    const copClosing = copDir.dot(toPlayer) < -0.35;
+
+    if(dist < 9.5 && Math.abs(steer) > .42 && Math.abs(velocity) > 11 &&
+       c.userData.ankleCooldown <= 0 && copClosing){
+      c.userData.ankleArmed = 1.9;
+    }
+
+    // Reward the fake-out when the cop was close but suddenly loses the line.
+    const copFacingPlayer = Math.abs(
+      Math.atan2(-(player.position.x-c.position.x),-(player.position.z-c.position.z)) - c.rotation.y
+    );
+    if(c.userData.ankleArmed > 0 && dist > 15.5 && Math.abs(steer) > .25){
+      c.userData.ankleArmed = 0;
+      c.userData.ankleCooldown = 5.5;
+
+      ankleCombo = ankleComboTimer > 0 ? Math.min(2, ankleCombo + 1) : 1;
+      ankleComboTimer = 7;
+      ankleMultiplierTimer = 6;
+
+      const bonus = ankleCombo === 1 ? 350 : ankleCombo === 2 ? 650 : 1000;
+      score += bonus;
+      cameraPunch = .28;
+
+      if(ankleCombo >= 2){
+        showMessage(`ANKLES DESTROYED! ${Math.min(3,1+ankleCombo)}× SCORE +${bonus}`);
+      } else {
+        showMessage(`ANKLE BREAKER! 2× SCORE +${bonus}`);
+      }
+    }
+
+    // Cars in this game move along their local -Z direction,
+    // so aim the police car's -Z axis toward the player.
+    const desired=Math.atan2(-dx,-dz);
+    let diff=(desired-c.rotation.y+Math.PI)%(Math.PI*2)-Math.PI;
+    c.rotation.y += THREE.MathUtils.clamp(diff,-1,1)*dt*(1.15+heat*.08);
+
+    let targetSpeed=17+heat*2.4;
+    if(dist>35) targetSpeed+=5;
+
+    const fleetLevelBonus = 1 + Math.max(0,runsBeaten-6)*0.025;
+    targetSpeed *= (c.userData.speedMult || 1) * fleetLevelBonus;
+
+    c.userData.velocity=THREE.MathUtils.lerp(c.userData.velocity,targetSpeed,1-Math.pow(.02,dt));
+
+    const dir=new THREE.Vector3(Math.sin(c.rotation.y),0,Math.cos(c.rotation.y));
+    c.position.addScaledVector(dir,-c.userData.velocity*dt);
+
+    updateCopHealthBar(c);
+
+    if(c.userData.siren){
+      const flash=Math.sin(t*14+i)>0;
+      c.userData.siren[0].material.emissiveIntensity=flash?4:.4;
+      c.userData.siren[1].material.emissiveIntensity=flash?.4:4;
+    }
+
+    if(dist > 3.2 && dist < 6.5 && driftEnabled && Math.abs(steer) > .55 && Math.abs(velocity) > 14){
+      score += 8 * dt * (ankleMultiplierTimer > 0 ? 2 : 1);
+    }
+
+    const policeTouchesPlayer =
+      (selectedVehicle === 'jet' || selectedVehicle === 'bomber')
+        ? copTouchesJet(c)
+        : selectedVehicle !== 'helicopter' && dist < 3.0;
+
+    if(policeTouchesPlayer && c.userData.hitCooldown<=0){
+      const hitPower = (c.userData.damageMult || 1) * (1 + Math.max(0,runsBeaten-6)*0.03);
+      damage((6+heat*1.5) * hitPower);
+      c.userData.hitCooldown=1.0;
+
+      if(selectedVehicle === 'jet' || selectedVehicle === 'bomber'){
+        velocity *= .90;
+        cameraPunch = Math.max(cameraPunch,.18);
+        showMessage(selectedVehicle === 'bomber' ? 'BOMBER HIT!' : 'JET HIT!');
+      } else {
+        velocity*=.78;
+        const push=new THREE.Vector3(dx,0,dz).normalize();
+        player.position.addScaledVector(push,1.2);
+        showMessage('POLICE HIT!');
+      }
+    }
+
+    if(dist>210){
+      removeCopHealthBar(c);
+      scene.remove(c);
+      cops.splice(i,1);
+    }
+  }
+}
+
+function updateCamera(dt){
+  if(escapeCutscene && cargoPlane) return;
+
+  const fwd=new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
+
+  if(cameraViewMode){
+    let camLocal, lookLocal;
+
+    if(selectedVehicle === 'bomber'){
+      camLocal = new THREE.Vector3(0,2.35,-4.4);
+      lookLocal = new THREE.Vector3(0,2.1,-34);
+    } else if(selectedVehicle === 'jet'){
+      camLocal = new THREE.Vector3(0,1.95,-2.9);
+      lookLocal = new THREE.Vector3(0,1.8,-28);
+    } else if(selectedVehicle === 'helicopter'){
+      camLocal = new THREE.Vector3(0,2.05,-.95);
+      lookLocal = new THREE.Vector3(0,2.0,-18);
+    } else {
+      camLocal = new THREE.Vector3(0,1.28,-.5);
+      lookLocal = new THREE.Vector3(0,1.2,-12);
+    }
+
+    const desired = player.localToWorld(camLocal.clone());
+    camera.position.lerp(desired,1-Math.pow(.00035,dt));
+
+    if(cameraPunch > 0){
+      camera.position.x += (Math.random()-.5) * cameraPunch * .35;
+      camera.position.y += (Math.random()-.5) * cameraPunch * .22;
+    }
+
+    const look = player.localToWorld(lookLocal.clone());
+    camera.lookAt(look);
+    return;
+  }
+
+  const camHeight = selectedVehicle === 'bomber' ? 15.0 : selectedVehicle === 'jet' ? 12.5 : selectedVehicle === 'helicopter' ? 9.5 : 6.2;
+  const camBack = selectedVehicle === 'bomber' ? 25.0 : selectedVehicle === 'jet' ? 20.0 : selectedVehicle === 'helicopter' ? 15.5 : 11.5;
+  const desired=player.position.clone().add(new THREE.Vector3(0,camHeight,0)).addScaledVector(fwd,camBack);
+  camera.position.lerp(desired,1-Math.pow(.0007,dt));
+
+  if(cameraPunch > 0){
+    camera.position.x += (Math.random()-.5) * cameraPunch;
+    camera.position.y += (Math.random()-.5) * cameraPunch * .55;
+  }
+
+  const look=player.position.clone().add(new THREE.Vector3(0,1.2,0)).addScaledVector(fwd,-5);
+  camera.lookAt(look);
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const now=performance.now();
+  const dt=Math.min(.033,(now-lastTime)/1000||.016);
+  lastTime=now;
+  const t=now/1000;
+
+  if(running){
+    updatePlayer(dt);
+    updateTrainingTargets(dt,t);
+    updateEnemyPlanes(dt,t);
+    updateRangeAtmosphere(t);
+    updateEnemyBase(dt);
+    updateCops(dt,t);
+
+    if(machineGunHeld && (selectedVehicle === 'jet' || selectedVehicle === 'bomber')){
+      fireAircraftMachineGun();
+    }
+
+    updateBullets(dt);
+    updateBombs(dt);
+    updateMissiles(dt);
+    updateBombReticle(t);
+    updateJetTargetReticle(t);
+
+    if(currentMap === 'chase' && score >= 10000 && !objectiveStar && !massiveCheckpoint && !extractionStarted && !extractionComplete){
+      setupEscapeObjective();
+    }
+
+    updateObjective(dt,t);
+    updateExtraction(dt);
+    updateCamera(dt);
+
+    ankleMultiplierTimer = Math.max(0, ankleMultiplierTimer - dt);
+    ankleComboTimer = Math.max(0, ankleComboTimer - dt);
+    cameraPunch = Math.max(0, cameraPunch - dt);
+    if(ankleComboTimer <= 0) ankleCombo = 0;
+
+    copSpawnTimer-=dt;
+    if(currentMap === 'chase' && copSpawnTimer<=0 && !extractionComplete){
+      if(!extractionStarted || Math.random() < .45) spawnCop();
+      copSpawnTimer=Math.max(1.2,4.1-heat*.45);
+    }
+
+    scoreTimer+=dt;
+    if(currentMap === 'chase' && scoreTimer>22 && heat<5){
+      scoreTimer=0; heat++; showMessage('WANTED LEVEL '+heat);
+    }
+
+    if(messageTimer>0){
+      messageTimer-=dt;
+      if(messageTimer<=0) ui.msg.classList.remove('show');
+    }
+    updateHUD();
+  } else if(escapeCutscene) {
+    if(bombReticle) bombReticle.visible = false;
+    if(jetTargetReticle) jetTargetReticle.visible = false;
+    cameraPunch = Math.max(0, cameraPunch - dt);
+    if(messageTimer>0){
+      messageTimer-=dt;
+      if(messageTimer<=0) ui.msg.classList.remove('show');
+    }
+    updateEscapeCutscene(dt);
+    updateHUD();
+  } else if(player) {
+    if(bombReticle) bombReticle.visible = false;
+    if(jetTargetReticle) jetTargetReticle.visible = false;
+    updateCamera(dt);
+  }
+
+  renderer.render(scene,camera);
+}
+
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+}
+
+document.getElementById('playBtn').addEventListener('click',()=>{
+  ui.start.style.display='none'; resetGame();
+});
+document.getElementById('restartBtn').addEventListener('click',resetGame);
+
+document.getElementById('start').addEventListener('wheel', e => e.stopPropagation(), {passive:true});
+document.getElementById('gameover').addEventListener('wheel', e => e.stopPropagation(), {passive:true});
+
+document.querySelectorAll('.upgradeBtn').forEach(btn=>{
+  btn.addEventListener('click',()=>buyUpgrade(btn.dataset.upgrade));
+});
+
+document.querySelectorAll('.vehicleBtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(btn.dataset.vehicle === 'helicopter' && runsBeaten < 3) return;
+    selectedVehicle = btn.dataset.vehicle;
+    updateUpgradeShop();
+  });
+});
+
+refreshUpgradeStats();
+updateUpgradeShop();
+init();
+</script>
+</body>
+</html>
